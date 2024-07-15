@@ -22,38 +22,42 @@ using Protocol = HTTPServer::Protocol;
 
 class StaticHandlerFactory : public RequestHandlerFactory {
 public:
-    void onServerStart(folly::EventBase* /*evb*/) noexcept override {
+    void onServerStart(folly::EventBase * /*evb*/) noexcept override {
     }
 
     void onServerStop() noexcept override {
     }
 
-    RequestHandler* onRequest(RequestHandler*, HTTPMessage*) noexcept override {
+    RequestHandler *onRequest(RequestHandler *, HTTPMessage *) noexcept override {
         return new StaticHandler;
     }
 };
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
     auto _ = folly::Init(&argc, &argv, true);
 
     Config::General general_config(CONFIG_DIR);
 
-    if(!general_config.Load())
+    if (!general_config.Load())
         return -1;
 
     std::vector<HTTPServer::IPConfig> IPs;
 
-    for(const auto& i: std::filesystem::directory_iterator(std::string(CONFIG_DIR) + "/hosts")) {
-        if(i.path().extension() == ".yaml") {
+    for (const auto &i: std::filesystem::directory_iterator(std::string(CONFIG_DIR) + "/hosts")) {
+        if (i.path().extension() == ".yaml") {
             Config::VHost host(i.path().string());
-            if(host.Load()) {
-                virtual_hosts.Put(host.hostname+':'+std::to_string(host.port), host.web_dir);
+            if (host.Load()) {
+                virtual_hosts.Put(host.hostname + ':' + std::to_string(host.port), host.web_dir);
                 HTTPServer::IPConfig vhost(SocketAddress(host.hostname, host.port, true), Protocol::HTTP);
-                wangle::SSLContextConfig cert;
-                cert.setCertificate(host.cert, host.private_key, host.password);
-                cert.clientVerification = folly::SSLContext::VerifyClientCertificate::DO_NOT_REQUEST;
-                vhost.sslConfigs.push_back(cert);
-                vhost.sslConfigs[0].isDefault = true;
+
+                if (host.ssl) {
+                    wangle::SSLContextConfig cert;
+                    cert.setCertificate(host.cert, host.private_key, host.password);
+                    cert.clientVerification = folly::SSLContext::VerifyClientCertificate::DO_NOT_REQUEST;
+                    vhost.sslConfigs.push_back(cert);
+                    vhost.sslConfigs[0].isDefault = true;
+                }
+
                 IPs.push_back(vhost);
             }
         }
@@ -75,6 +79,7 @@ int main(int argc, char* argv[]) {
 
     HTTPServer server(std::move(options));
     server.bind(IPs);
+
     // Start HTTPServer mainloop in a separate thread
     std::thread t([&]() { server.start(); });
 

@@ -2,7 +2,6 @@
 #include "defines.h"
 
 
-
 #include <folly/FileUtil.h>
 #include <folly/executors/GlobalExecutor.h>
 #include <folly/io/async/EventBaseManager.h>
@@ -25,14 +24,13 @@ void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
         return;
     }
 
-    auto h= headers->getHeaders().rawGet("Host");
-
-    if(virtual_hosts.Cached(h)){
-        path_ = *virtual_hosts.Get(h) + '/' + std::string(headers->getPathAsStringPiece().subpiece(1).str());
+    auto h = headers->getHeaders().rawGet("Host");
+    auto f = virtual_hosts.TryGet(h);
+    if (f.second) {
+        path_ = *f.first + '/' + std::string(headers->getPathAsStringPiece().subpiece(1).str());
 
         if (cache.Cached(path_)) {
             LOG(INFO) << path_ << "exists";
-
             ResponseBuilder(downstream_)
                     .status(STATUS_200)
                     .body(cache.Get(path_)->c_str())

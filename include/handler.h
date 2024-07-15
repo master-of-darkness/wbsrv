@@ -13,12 +13,14 @@ namespace proxygen {
     class ResponseHandler;
 }
 
-struct VHost{
-    VHost(std::string v1, std::string v2): host(std::move(v1)), web_dir(std::move(v2)) {};
+struct VHost {
+    VHost(std::string v1, std::string v2) : host(std::move(v1)), web_dir(std::move(v2)) {};
 
     std::string host;
     std::string web_dir;
-}; typedef VHost VHost;
+};
+
+typedef VHost VHost;
 
 extern caches::fixed_sized_cache<std::string, std::string> virtual_hosts;
 extern caches::fixed_sized_cache<int, std::vector<VHost>> same_port;

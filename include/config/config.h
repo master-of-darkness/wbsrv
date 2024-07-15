@@ -8,10 +8,11 @@ namespace Config {
         explicit General(std::string path) {
             path_ = path;
         }
+
         bool Load();
+
         int threads = 0;
         std::string host;
-        bool http2 = false;
     private:
         std::string path_;
     };
@@ -21,6 +22,7 @@ namespace Config {
         explicit VHost(std::string path) {
             path_ = path;
         }
+
         bool Load();
 
         std::string private_key;
@@ -28,6 +30,8 @@ namespace Config {
         std::string password;
         std::string hostname;
         std::string web_dir;
+        bool ssl = false;
+
         int port = 80;
     private:
         std::string path_;
