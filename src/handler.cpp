@@ -1,6 +1,6 @@
 #include "handler.h"
 #include "defines.h"
-
+#include "utils/utils.h"
 
 #include <folly/FileUtil.h>
 #include <folly/executors/GlobalExecutor.h>
@@ -8,10 +8,18 @@
 #include <proxygen/httpserver/RequestHandler.h>
 #include <proxygen/httpserver/ResponseBuilder.h>
 #include <filesystem>
+#include <utility>
 
 using namespace proxygen;
 
-caches::fixed_sized_cache<std::string, std::string, caches::LRUCachePolicy> cache(256);
+struct CacheRow{
+    CacheRow(std::string &content_type, std::string text): content_type(content_type), text(std::move(text)) {}
+
+    std::string content_type;
+    std::string text;
+};
+
+caches::fixed_sized_cache<std::string, CacheRow, caches::LRUCachePolicy> cache(256);
 caches::fixed_sized_cache<std::string, std::string> virtual_hosts(256);
 
 void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
@@ -31,9 +39,11 @@ void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
 
         if (cache.Cached(path_)) {
             LOG(INFO) << path_ << "exists";
+            auto row = cache.Get(path_);
             ResponseBuilder(downstream_)
                     .status(STATUS_200)
-                    .body(cache.Get(path_)->c_str())
+                    .header("Content-Type", row->content_type)
+                    .body(row->text)
                     .sendWithEOM();
         } else {
             LOG(INFO) << path_ << "not exists";
@@ -51,7 +61,14 @@ void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
                 return;
             }
 
-            ResponseBuilder(downstream_).status(STATUS_200).send();
+//            ResponseBuilder(downstream_).status(STATUS_200).send();
+
+            std::string cnt_type = utils::getContentType(path_.c_str());
+            cache.Put(path_, CacheRow(cnt_type, ""));
+            ResponseBuilder(downstream_)
+                    .status(STATUS_200)
+                    .header("Content-Type", cnt_type).send();
+
             // use a CPU executor since read(2) of a file can block
             readFileScheduled_ = true;
             folly::getUnsafeMutableGlobalCPUExecutor()->add(
@@ -71,7 +88,6 @@ void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
 void StaticHandler::readFile(folly::EventBase *evb) {
     folly::IOBufQueue buf;
 
-    cache.Put(path_, "");
 
     while (file_ && !paused_) {
         // read 4k-ish chunks and foward each one to the client
@@ -101,7 +117,7 @@ void StaticHandler::readFile(folly::EventBase *evb) {
             auto cache_ptr = cache.Get(path_);
             evb->runInEventBaseThread([this, body = buf.move(), cache_ptr]() mutable {
                 if (!error_) {
-                    cache_ptr->append(body->moveToFbString().c_str());
+                    cache_ptr->text.append(body->moveToFbString().c_str());
                     ResponseBuilder(downstream_).body(std::move(body)).send();
                 }
             });

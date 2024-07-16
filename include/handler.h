@@ -23,7 +23,6 @@ struct VHost {
 typedef VHost VHost;
 
 extern caches::fixed_sized_cache<std::string, std::string> virtual_hosts;
-extern caches::fixed_sized_cache<int, std::vector<VHost>> same_port;
 
 class StaticHandler : public proxygen::RequestHandler {
 public:
