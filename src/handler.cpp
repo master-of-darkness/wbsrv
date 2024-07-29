@@ -25,13 +25,6 @@ caches::fixed_sized_cache<std::string, std::string> virtual_hosts(256);
 
 void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
     error_ = false;
-    if (headers->getMethod() != HTTPMethod::GET) {
-        ResponseBuilder(downstream_)
-                .status(400, "Bad method")
-                .body("Only GET is supported")
-                .sendWithEOM();
-        return;
-    }
 
     auto h = headers->getHeaders().rawGet("Host");
     auto f = virtual_hosts.TryGet(h);
@@ -39,7 +32,6 @@ void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
         path_ = *f.first + '/' + headers->getPathAsStringPiece().subpiece(1).str();
 
         if (cache.Cached(path_)) {
-            LOG(INFO) << path_ << " exists";
             auto row = cache.Get(path_);
             ResponseBuilder(downstream_)
                     .status(STATUS_200)
@@ -47,8 +39,6 @@ void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
                     .body(row->text)
                     .sendWithEOM();
         } else {
-            LOG(INFO) << path_ << " not exists";
-
             try {
                 file_ = std::make_unique<folly::File>(path_);
             } catch (const std::system_error& ex) {
@@ -77,8 +67,8 @@ void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
         }
     } else {
         ResponseBuilder(downstream_)
-                .status(400, "Bad method")
-                .body("Only GET is supported")
+                .status(STATUS_200)
+                .body("Default page")
                 .sendWithEOM();
         return;
     }
@@ -93,7 +83,9 @@ void StaticHandler::readFile(folly::EventBase* evb) {
         auto rc = folly::readNoInt(file_->fd(), data.first, data.second);
         if (rc < 0) {
             // error
+#ifndef NDEBUG
             VLOG(4) << "Read error=" << rc;
+#endif
             file_.reset();
             evb->runInEventBaseThread([this] {
                 LOG(ERROR) << "Error reading file";
@@ -103,7 +95,9 @@ void StaticHandler::readFile(folly::EventBase* evb) {
         } else if (rc == 0) {
             // done
             file_.reset();
+#ifndef NDEBUG
             VLOG(4) << "Read EOF";
+#endif
             evb->runInEventBaseThread([this] {
                 if (!error_) {
                     ResponseBuilder(downstream_).sendWithEOM();
@@ -126,7 +120,9 @@ void StaticHandler::readFile(folly::EventBase* evb) {
     evb->runInEventBaseThread([this] {
         readFileScheduled_ = false;
         if (!checkForCompletion() && !paused_) {
+#ifndef NDEBUG
             VLOG(4) << "Resuming deferred readFile";
+#endif
             onEgressResumed();
         }
     });
@@ -134,12 +130,16 @@ void StaticHandler::readFile(folly::EventBase* evb) {
 
 void StaticHandler::onEgressPaused() noexcept {
     // This will terminate readFile soon
+#ifndef NDEBUG
     VLOG(4) << "StaticHandler paused";
+#endif
     paused_ = true;
 }
 
 void StaticHandler::onEgressResumed() noexcept {
+#ifndef NDEBUG
     VLOG(4) << "StaticHandler resumed";
+#endif
     paused_ = false;
     // If readFileScheduled_, it will reschedule itself
     if (!readFileScheduled_ && file_) {
@@ -149,7 +149,9 @@ void StaticHandler::onEgressResumed() noexcept {
                           this,
                           folly::EventBaseManager::get()->getEventBase()));
     } else {
+#ifndef NDEBUG
         VLOG(4) << "Deferred scheduling readFile";
+#endif
     }
 }
 
@@ -179,7 +181,9 @@ void StaticHandler::onError(ProxygenError /*err*/) noexcept {
 
 bool StaticHandler::checkForCompletion() {
     if (finished_ && !readFileScheduled_) {
+#ifndef NDEBUG
         VLOG(4) << "deleting StaticHandler";
+#endif
         delete this;
         return true;
     }
