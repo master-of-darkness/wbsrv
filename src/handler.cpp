@@ -12,8 +12,9 @@
 
 using namespace proxygen;
 
-struct CacheRow{
-    CacheRow(std::string &content_type, std::string text): content_type(content_type), text(std::move(text)) {}
+struct CacheRow {
+    CacheRow(std::string content_type, std::string text)
+            : content_type(std::move(content_type)), text(std::move(text)) {}
 
     std::string content_type;
     std::string text;
@@ -35,10 +36,10 @@ void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
     auto h = headers->getHeaders().rawGet("Host");
     auto f = virtual_hosts.TryGet(h);
     if (f.second) {
-        path_ = *f.first + '/' + std::string(headers->getPathAsStringPiece().subpiece(1).str());
+        path_ = *f.first + '/' + headers->getPathAsStringPiece().subpiece(1).str();
 
         if (cache.Cached(path_)) {
-            LOG(INFO) << path_ << "exists";
+            LOG(INFO) << path_ << " exists";
             auto row = cache.Get(path_);
             ResponseBuilder(downstream_)
                     .status(STATUS_200)
@@ -46,11 +47,11 @@ void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
                     .body(row->text)
                     .sendWithEOM();
         } else {
-            LOG(INFO) << path_ << "not exists";
+            LOG(INFO) << path_ << " not exists";
 
             try {
                 file_ = std::make_unique<folly::File>(path_);
-            } catch (const std::system_error &ex) {
+            } catch (const std::system_error& ex) {
                 ResponseBuilder(downstream_)
                         .status(STATUS_404)
                         .body(folly::to<std::string>("Could not find ",
@@ -61,9 +62,7 @@ void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
                 return;
             }
 
-//            ResponseBuilder(downstream_).status(STATUS_200).send();
-
-            std::string cnt_type = utils::getContentType(path_.c_str());
+            std::string cnt_type = utils::getContentType(path_);
             cache.Put(path_, CacheRow(cnt_type, ""));
             ResponseBuilder(downstream_)
                     .status(STATUS_200)
@@ -85,12 +84,11 @@ void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
     }
 }
 
-void StaticHandler::readFile(folly::EventBase *evb) {
-    folly::IOBufQueue buf;
-
+void StaticHandler::readFile(folly::EventBase* evb) {
+    folly::IOBufQueue buf(folly::IOBufQueue::cacheChainLength());
 
     while (file_ && !paused_) {
-        // read 4k-ish chunks and foward each one to the client
+        // read 4k-ish chunks and forward each one to the client
         auto data = buf.preallocate(4000, 4000);
         auto rc = folly::readNoInt(file_->fd(), data.first, data.second);
         if (rc < 0) {
@@ -187,4 +185,3 @@ bool StaticHandler::checkForCompletion() {
     }
     return false;
 }
-
