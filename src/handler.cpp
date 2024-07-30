@@ -20,23 +20,22 @@ struct CacheRow {
     std::string text;
 };
 
-caches::fixed_sized_cache<std::string, CacheRow, caches::LRUCachePolicy> cache(256);
-caches::fixed_sized_cache<std::string, std::string> virtual_hosts(256);
+LRUCache<std::string, CacheRow> cache(256);
+LRUCache<std::string, std::string> virtual_hosts(256);
 
 void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
     error_ = false;
 
     auto h = headers->getHeaders().rawGet("Host");
-    auto f = virtual_hosts.TryGet(h);
-    if (f.second) {
-        path_ = *f.first + '/' + headers->getPathAsStringPiece().subpiece(1).str();
+    if (auto vhost = virtual_hosts.get(h); vhost) {
+        path_ = vhost.value() + '/' + headers->getPathAsStringPiece().subpiece(1).str();
 
-        if (cache.Cached(path_)) {
-            auto row = cache.Get(path_);
+        if (auto text = cache.get(path_); text) {
+            auto row = text.value();
             ResponseBuilder(downstream_)
                     .status(STATUS_200)
-                    .header("Content-Type", row->content_type)
-                    .body(row->text)
+                    .header("Content-Type", row.content_type)
+                    .body(row.text)
                     .sendWithEOM();
         } else {
             try {
@@ -53,7 +52,7 @@ void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
             }
 
             std::string cnt_type = utils::getContentType(path_);
-            cache.Put(path_, CacheRow(cnt_type, ""));
+            cache.put(path_, CacheRow(cnt_type, ""));
             ResponseBuilder(downstream_)
                     .status(STATUS_200)
                     .header("Content-Type", cnt_type).send();
@@ -67,8 +66,8 @@ void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
         }
     } else {
         ResponseBuilder(downstream_)
-                .status(STATUS_200)
-                .body("Default page")
+                .status(STATUS_400)
+                .body("Bad request")
                 .sendWithEOM();
         return;
     }
@@ -106,7 +105,7 @@ void StaticHandler::readFile(folly::EventBase* evb) {
             break;
         } else {
             buf.postallocate(rc);
-            auto cache_ptr = cache.Get(path_);
+            auto cache_ptr = cache.get(path_);
             evb->runInEventBaseThread([this, body = buf.move(), cache_ptr]() mutable {
                 if (!error_) {
                     cache_ptr->text.append(body->moveToFbString().c_str());

@@ -6,8 +6,7 @@
 #include <folly/Memory.h>
 #include <proxygen/httpserver/RequestHandler.h>
 
-#include "cache.hpp"
-#include "lru_cache_policy.hpp"
+#include "utils/lru_cache.h"
 
 namespace proxygen {
     class ResponseHandler;
@@ -22,7 +21,7 @@ struct VHost {
 
 typedef VHost VHost;
 
-extern caches::fixed_sized_cache<std::string, std::string> virtual_hosts;
+extern LRUCache<std::string, std::string> virtual_hosts;
 
 class StaticHandler : public proxygen::RequestHandler {
 public:

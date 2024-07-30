@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
         if (i.path().extension() == ".yaml") {
             Config::VHost host(i.path().string());
             if (host.Load()) {
-                virtual_hosts.Put(host.hostname + ':' + std::to_string(host.port), host.web_dir);
+                virtual_hosts.put(host.hostname + ':' + std::to_string(host.port), host.web_dir);
                 HTTPServer::IPConfig vhost(SocketAddress(host.hostname, host.port, true), Protocol::HTTP);
 
                 if (host.ssl) {

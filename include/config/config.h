@@ -19,7 +19,7 @@ namespace Config {
     class VHost {
     public:
         explicit VHost(std::string path) {
-            path_ = path;
+            path_ = std::move(path);
         }
 
         bool Load();
