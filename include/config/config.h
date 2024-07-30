@@ -12,7 +12,6 @@ namespace Config {
         bool Load();
 
         int threads = 0;
-        std::string host;
     private:
         std::string path_;
     };

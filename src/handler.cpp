@@ -83,7 +83,7 @@ void StaticHandler::readFile(folly::EventBase* evb) {
         auto rc = folly::readNoInt(file_->fd(), data.first, data.second);
         if (rc < 0) {
             // error
-#ifndef NDEBUG
+#ifdef DEBUG
             VLOG(4) << "Read error=" << rc;
 #endif
             file_.reset();
@@ -95,7 +95,7 @@ void StaticHandler::readFile(folly::EventBase* evb) {
         } else if (rc == 0) {
             // done
             file_.reset();
-#ifndef NDEBUG
+#ifdef DEBUG
             VLOG(4) << "Read EOF";
 #endif
             evb->runInEventBaseThread([this] {
@@ -120,7 +120,7 @@ void StaticHandler::readFile(folly::EventBase* evb) {
     evb->runInEventBaseThread([this] {
         readFileScheduled_ = false;
         if (!checkForCompletion() && !paused_) {
-#ifndef NDEBUG
+#ifdef DEBUG
             VLOG(4) << "Resuming deferred readFile";
 #endif
             onEgressResumed();
@@ -130,14 +130,14 @@ void StaticHandler::readFile(folly::EventBase* evb) {
 
 void StaticHandler::onEgressPaused() noexcept {
     // This will terminate readFile soon
-#ifndef NDEBUG
+#ifdef DEBUG
     VLOG(4) << "StaticHandler paused";
 #endif
     paused_ = true;
 }
 
 void StaticHandler::onEgressResumed() noexcept {
-#ifndef NDEBUG
+#ifdef DEBUG
     VLOG(4) << "StaticHandler resumed";
 #endif
     paused_ = false;
@@ -149,7 +149,7 @@ void StaticHandler::onEgressResumed() noexcept {
                           this,
                           folly::EventBaseManager::get()->getEventBase()));
     } else {
-#ifndef NDEBUG
+#ifdef DEBUG
         VLOG(4) << "Deferred scheduling readFile";
 #endif
     }
@@ -181,7 +181,7 @@ void StaticHandler::onError(ProxygenError /*err*/) noexcept {
 
 bool StaticHandler::checkForCompletion() {
     if (finished_ && !readFileScheduled_) {
-#ifndef NDEBUG
+#ifdef DEBUG
         VLOG(4) << "deleting StaticHandler";
 #endif
         delete this;

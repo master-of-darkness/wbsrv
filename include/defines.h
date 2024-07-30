@@ -2,4 +2,5 @@
 #define STATUS_404 404, "Not found"
 #define STATUS_400 400, "Bad method"
 #define CONFIG_DIR "/home/an/nonen"
+#define DAEMON_NAME "webserver"
 #define DEFAULTPAGE_FILENAME "index.html"

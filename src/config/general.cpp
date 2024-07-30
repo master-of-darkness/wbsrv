@@ -8,9 +8,7 @@ using namespace Config;
 bool General::Load() {
     YAML::Node config = YAML::LoadFile(this->path_ + "/server.yaml");
     if (!config.IsNull()) {
-        this->host = config["host"].as<std::string>();
         this->threads = config["threads"].as<int>();
-
         return true;
     }
     return false;
