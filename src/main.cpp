@@ -133,7 +133,7 @@ int main(int argc, char *argv[]) {
 
     HTTPServer server(std::move(options));
     server.bind(IPs);
-    server.start();
+
     // Start HTTPServer mainloop in a separate thread
     std::thread t([&]() { server.start(); });
 
