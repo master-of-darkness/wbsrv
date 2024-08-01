@@ -27,15 +27,14 @@ void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
     error_ = false;
 
     auto h = headers->getHeaders().rawGet("Host");
-    if (auto vhost = virtual_hosts.get(h); vhost) {
-        path_ = vhost.value() + '/' + headers->getPathAsStringPiece().subpiece(1).str();
+    if (auto vhost = virtual_hosts.get(h); vhost != nullptr) {
+        path_ = *vhost + '/' + headers->getPathAsStringPiece().subpiece(1).str();
 
-        if (auto text = cache.get(path_); text) {
-            auto row = text.value();
+        if (auto text = cache.get(path_); text != nullptr) {
             ResponseBuilder(downstream_)
                     .status(STATUS_200)
-                    .header("Content-Type", row.content_type)
-                    .body(row.text)
+                    .header("Content-Type", text->content_type)
+                    .body(text->text)
                     .sendWithEOM();
         } else {
             try {
