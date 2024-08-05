@@ -10,31 +10,39 @@
 #include <filesystem>
 #include <utility>
 
+
 using namespace proxygen;
 
 struct CacheRow {
     CacheRow(std::string content_type, std::string text)
             : content_type(std::move(content_type)), text(std::move(text)) {}
+    CacheRow() = default;
+
+    bool operator!=(const CacheRow& rhs) const{
+        return (this->content_type == rhs.content_type) && (this->text == rhs.text);
+    }
 
     std::string content_type;
     std::string text;
 };
 
-LRUCache<std::string, CacheRow> cache(256);
-LRUCache<std::string, std::string> virtual_hosts(256);
+ConcurrentLRUCache<std::string, CacheRow> cache(256);
+ConcurrentLRUCache<std::string, std::string> virtual_hosts(256);
 
 void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
     error_ = false;
+    ConcurrentLRUCache<std::string, std::string>::ConstAccessor const_acc_1;
+    ConcurrentLRUCache<std::string, CacheRow>::ConstAccessor const_acc_2;
 
-    auto h = headers->getHeaders().rawGet("Host");
-    if (auto vhost = virtual_hosts.get(h); vhost != nullptr) {
-        path_ = *vhost + '/' + headers->getPathAsStringPiece().subpiece(1).str();
+    if (auto v = virtual_hosts.find(const_acc_1, headers->getHeaders().getSingleOrEmpty(HTTP_HEADER_HOST)); v) {
+        path_ = *const_acc_1 + '/' + headers->getPathAsStringPiece().subpiece(1).str();
 
-        if (auto text = cache.get(path_); text != nullptr) {
+        if (auto g = cache.find(const_acc_2, path_); g) {
+            auto text = *const_acc_2;
             ResponseBuilder(downstream_)
                     .status(STATUS_200)
-                    .header("Content-Type", text->content_type)
-                    .body(text->text)
+                    .header("Content-Type", text.content_type)
+                    .body(text.text)
                     .sendWithEOM();
         } else {
             try {
@@ -50,11 +58,12 @@ void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
                 return;
             }
 
-            std::string cnt_type = utils::getContentType(path_);
-            cache.put(path_, CacheRow(cnt_type, ""));
+            _temp_content_type = utils::getContentType(path_);
+
             ResponseBuilder(downstream_)
                     .status(STATUS_200)
-                    .header("Content-Type", cnt_type).send();
+                    .header("Content-Type", _temp_content_type)
+                    .send();
 
             // use a CPU executor since read(2) of a file can block
             readFileScheduled_ = true;
@@ -96,18 +105,19 @@ void StaticHandler::readFile(folly::EventBase* evb) {
 #ifdef DEBUG
             VLOG(4) << "Read EOF";
 #endif
+
             evb->runInEventBaseThread([this] {
                 if (!error_) {
+                    cache.insert(path_, CacheRow(_temp_content_type, _temp_text));
                     ResponseBuilder(downstream_).sendWithEOM();
                 }
             });
             break;
         } else {
             buf.postallocate(rc);
-            auto cache_ptr = cache.get(path_);
-            evb->runInEventBaseThread([this, body = buf.move(), cache_ptr]() mutable {
+            evb->runInEventBaseThread([this, body = buf.move()]() mutable {
                 if (!error_) {
-                    cache_ptr->text.append(body->moveToFbString().c_str());
+                    body->appendTo(_temp_text);
                     ResponseBuilder(downstream_).body(std::move(body)).send();
                 }
             });

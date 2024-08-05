@@ -1,7 +1,7 @@
 # wbsrv
 
 `wbsrv` is a high-performance web server designed to handle heavy traffic efficiently and securely. This project is built with a focus on speed, scalability, and ease of use.
-
+**DISCLAIMER:** Please, don't use it in production, it still under heavily development
 ## Features
 
 - **High Performance:** Optimized for handling thousands of concurrent connections.
@@ -74,3 +74,4 @@ ssl: true # false if you don't want to use secure connection
 ## Dependencies
 - [Proxygen](https://github.com/facebook/proxygen)
 - [yaml-cpp](https://github.com/jbeder/yaml-cpp)
+- [oneTBB](https://github.com/oneapi-src/oneTBB)

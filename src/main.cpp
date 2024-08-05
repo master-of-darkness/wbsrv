@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <syslog.h>
 
+
 #include "handler.h"
 #include "defines.h"
 #include "config/config.h"
@@ -36,6 +37,7 @@ public:
 
 int main(int argc, char *argv[]) {
     auto _ = folly::Init(&argc, &argv, true);
+
 
 #ifndef DEBUG
     //thx for alexdlaird
@@ -101,7 +103,7 @@ int main(int argc, char *argv[]) {
         if (i.path().extension() == ".yaml") {
             Config::VHost host(i.path().string());
             if (host.Load()) {
-                virtual_hosts.put(host.hostname + ':' + std::to_string(host.port), host.web_dir);
+                virtual_hosts.insert(host.hostname + ':' + std::to_string(host.port), host.web_dir);
                 HTTPServer::IPConfig vhost(SocketAddress(host.hostname, host.port, true), Protocol::HTTP);
 
                 if (host.ssl) {

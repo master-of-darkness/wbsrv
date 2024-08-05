@@ -5,8 +5,8 @@
 #include <folly/File.h>
 #include <folly/Memory.h>
 #include <proxygen/httpserver/RequestHandler.h>
-
-#include "utils/lru_cache.h"
+#define TBB_PREVIEW_CONCURRENT_LRU_CACHE true
+#include "utils/concurrent_lru_cache.h"
 
 namespace proxygen {
     class ResponseHandler;
@@ -21,7 +21,7 @@ struct VHost {
 
 typedef VHost VHost;
 
-extern LRUCache<std::string, std::string> virtual_hosts;
+extern ConcurrentLRUCache<std::string, std::string> virtual_hosts;
 
 class StaticHandler : public proxygen::RequestHandler {
 public:
@@ -46,6 +46,9 @@ private:
     void readFile(folly::EventBase *evb);
 
     bool checkForCompletion();
+
+    std::string _temp_text;
+    std::string _temp_content_type;
 
     std::string path_;
     std::unique_ptr<folly::File> file_;
