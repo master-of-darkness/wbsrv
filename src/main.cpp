@@ -15,6 +15,7 @@
 #include "handler.h"
 #include "defines.h"
 #include "config/config.h"
+#include "vhost/vhost.h"
 
 using namespace proxygen;
 
@@ -99,25 +100,27 @@ int main(int argc, char *argv[]) {
 
     std::vector<HTTPServer::IPConfig> IPs;
 
-    for (const auto &i: std::filesystem::directory_iterator(std::string(CONFIG_DIR) + "/hosts")) {
-        if (i.path().extension() == ".yaml") {
-            Config::VHost host(i.path().string());
-            if (host.Load()) {
-                virtual_hosts.insert(host.hostname + ':' + std::to_string(host.port), host.web_dir);
-                HTTPServer::IPConfig vhost(SocketAddress(host.hostname, host.port, true), Protocol::HTTP);
-
-                if (host.ssl) {
-                    wangle::SSLContextConfig cert;
-                    cert.setCertificate(host.cert, host.private_key, host.password);
-                    cert.clientVerification = folly::SSLContext::VerifyClientCertificate::DO_NOT_REQUEST;
-                    vhost.sslConfigs.push_back(cert);
-                    vhost.sslConfigs[0].isDefault = true;
-                }
-
-                IPs.push_back(vhost);
-            }
-        }
-    }
+    if(!vhost::load(IPs))
+        return -1;
+//    for (const auto &i: std::filesystem::directory_iterator(std::string(CONFIG_DIR) + "/hosts")) {
+//        if (i.path().extension() == ".yaml") {
+//            Config::VHost host(i.path().string());
+//            if (host.Load()) {
+//                virtual_hosts.insert(host.hostname + ':' + std::to_string(host.port), host.web_dir);
+//                HTTPServer::IPConfig vhost(SocketAddress(host.hostname, host.port, true), Protocol::HTTP);
+//
+//                if (host.ssl) {
+//                    wangle::SSLContextConfig cert;
+//                    cert.setCertificate(host.cert, host.private_key, host.password);
+//                    cert.clientVerification = folly::SSLContext::VerifyClientCertificate::DO_NOT_REQUEST;
+//                    vhost.sslConfigs.push_back(cert);
+//                    vhost.sslConfigs[0].isDefault = true;
+//                }
+//
+//                IPs.push_back(vhost);
+//            }
+//        }
+//    }
 
     HTTPServerOptions options;
     options.threads = static_cast<size_t>(general_config.threads);

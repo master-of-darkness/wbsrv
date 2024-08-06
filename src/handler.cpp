@@ -1,7 +1,3 @@
-#include "handler.h"
-#include "defines.h"
-#include "utils/utils.h"
-
 #include <folly/FileUtil.h>
 #include <folly/executors/GlobalExecutor.h>
 #include <folly/io/async/EventBaseManager.h>
@@ -10,6 +6,10 @@
 #include <filesystem>
 #include <utility>
 
+#include "handler.h"
+#include "defines.h"
+#include "utils/utils.h"
+#include "vhost/vhost.h"
 
 using namespace proxygen;
 
@@ -26,16 +26,15 @@ struct CacheRow {
     std::string text;
 };
 
-ConcurrentLRUCache<std::string, CacheRow> cache(256);
-ConcurrentLRUCache<std::string, std::string> virtual_hosts(256);
+utils::ConcurrentLRUCache<std::string, CacheRow> cache(256);
 
 void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
     error_ = false;
-    ConcurrentLRUCache<std::string, std::string>::ConstAccessor const_acc_1;
-    ConcurrentLRUCache<std::string, CacheRow>::ConstAccessor const_acc_2;
+    vhost::const_accessor c_acc;
+    utils::ConcurrentLRUCache<std::string, CacheRow>::ConstAccessor const_acc_2;
 
-    if (auto v = virtual_hosts.find(const_acc_1, headers->getHeaders().getSingleOrEmpty(HTTP_HEADER_HOST)); v) {
-        path_ = *const_acc_1 + '/' + headers->getPathAsStringPiece().subpiece(1).str();
+    if (auto v = vhost::list.find(c_acc, headers->getHeaders().getSingleOrEmpty(HTTP_HEADER_HOST)); v) {
+        path_ = *c_acc + '/' + headers->getPathAsStringPiece().subpiece(1).str();
 
         if (auto g = cache.find(const_acc_2, path_); g) {
             auto text = *const_acc_2;

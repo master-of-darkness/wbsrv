@@ -5,8 +5,8 @@
 #include <folly/File.h>
 #include <folly/Memory.h>
 #include <proxygen/httpserver/RequestHandler.h>
-#define TBB_PREVIEW_CONCURRENT_LRU_CACHE true
-#include "utils/concurrent_lru_cache.h"
+
+#include "utils/utils.h"
 
 namespace proxygen {
     class ResponseHandler;
@@ -20,8 +20,6 @@ struct VHost {
 };
 
 typedef VHost VHost;
-
-extern ConcurrentLRUCache<std::string, std::string> virtual_hosts;
 
 class StaticHandler : public proxygen::RequestHandler {
 public:
