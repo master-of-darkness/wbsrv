@@ -33,7 +33,7 @@ void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
     vhost::const_accessor c_acc;
     utils::ConcurrentLRUCache<std::string, CacheRow>::ConstAccessor const_acc_2;
 
-    if (auto v = vhost::list.find(c_acc, headers->getHeaders().getSingleOrEmpty(HTTP_HEADER_HOST)); v) {
+    if (auto v = vhost::list.find(c_acc, hostname); v) {
         path_ = *c_acc + '/' + headers->getPathAsStringPiece().subpiece(1).str();
 
         if (auto g = cache.find(const_acc_2, path_); g) {
@@ -196,3 +196,4 @@ bool StaticHandler::checkForCompletion() {
     }
     return false;
 }
+

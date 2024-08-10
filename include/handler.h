@@ -23,6 +23,8 @@ typedef VHost VHost;
 
 class StaticHandler : public proxygen::RequestHandler {
 public:
+    explicit StaticHandler(std::string hostname): hostname(std::move(hostname)) {};
+
     void onRequest(
             std::unique_ptr<proxygen::HTTPMessage> headers) noexcept override;
 
@@ -44,6 +46,8 @@ private:
     void readFile(folly::EventBase *evb);
 
     bool checkForCompletion();
+
+    std::string hostname;
 
     std::string _temp_text;
     std::string _temp_content_type;

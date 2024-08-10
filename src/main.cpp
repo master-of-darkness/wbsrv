@@ -21,8 +21,6 @@ using namespace proxygen;
 
 using folly::SocketAddress;
 
-using Protocol = HTTPServer::Protocol;
-
 class StaticHandlerFactory : public RequestHandlerFactory {
 public:
     void onServerStart(folly::EventBase * /*evb*/) noexcept override {
@@ -31,8 +29,8 @@ public:
     void onServerStop() noexcept override {
     }
 
-    RequestHandler *onRequest(RequestHandler *, HTTPMessage *) noexcept override {
-        return new StaticHandler;
+    RequestHandler *onRequest(RequestHandler *, HTTPMessage *b) noexcept override {
+        return new StaticHandler(b->getHeaders().getSingleOrEmpty(HTTP_HEADER_HOST));
     }
 };
 
@@ -102,25 +100,6 @@ int main(int argc, char *argv[]) {
 
     if(!vhost::load(IPs))
         return -1;
-//    for (const auto &i: std::filesystem::directory_iterator(std::string(CONFIG_DIR) + "/hosts")) {
-//        if (i.path().extension() == ".yaml") {
-//            Config::VHost host(i.path().string());
-//            if (host.Load()) {
-//                virtual_hosts.insert(host.hostname + ':' + std::to_string(host.port), host.web_dir);
-//                HTTPServer::IPConfig vhost(SocketAddress(host.hostname, host.port, true), Protocol::HTTP);
-//
-//                if (host.ssl) {
-//                    wangle::SSLContextConfig cert;
-//                    cert.setCertificate(host.cert, host.private_key, host.password);
-//                    cert.clientVerification = folly::SSLContext::VerifyClientCertificate::DO_NOT_REQUEST;
-//                    vhost.sslConfigs.push_back(cert);
-//                    vhost.sslConfigs[0].isDefault = true;
-//                }
-//
-//                IPs.push_back(vhost);
-//            }
-//        }
-//    }
 
     HTTPServerOptions options;
     options.threads = static_cast<size_t>(general_config.threads);
