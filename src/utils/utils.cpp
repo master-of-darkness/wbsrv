@@ -34,7 +34,7 @@ constexpr std::pair<const char *, const char *> contentTypes[] = {
 
 namespace utils {
 
-    std::string getContentType(const std::string &path) {
+    const char* getContentType(const std::string &path) {
         for (const auto &extension: contentTypes) {
             if (path.ends_with(extension.first)) {
                 return extension.second;

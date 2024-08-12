@@ -2,5 +2,5 @@
 #include "utils/concurrent_lru_cache.h"
 
 namespace utils {
-    std::string getContentType(const std::string &path);
+    const char* getContentType(const std::string &path);
 }

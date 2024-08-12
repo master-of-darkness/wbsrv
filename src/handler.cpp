@@ -14,16 +14,12 @@
 using namespace proxygen;
 
 struct CacheRow {
-    CacheRow(std::string content_type, std::string text)
-            : content_type(std::move(content_type)), text(std::move(text)) {}
-    CacheRow() = default;
-
     bool operator!=(const CacheRow& rhs) const{
         return (this->content_type == rhs.content_type) && (this->text == rhs.text);
     }
 
-    std::string content_type;
-    std::string text;
+    const char* content_type;
+    const char* text;
 };
 
 utils::ConcurrentLRUCache<std::string, CacheRow> cache(256);
@@ -107,7 +103,7 @@ void StaticHandler::readFile(folly::EventBase* evb) {
 
             evb->runInEventBaseThread([this] {
                 if (!error_) {
-                    cache.insert(path_, CacheRow(_temp_content_type, _temp_text));
+                    cache.insert(path_, CacheRow{_temp_content_type, _temp_text.data()});
                     ResponseBuilder(downstream_).sendWithEOM();
                 }
             });

@@ -50,7 +50,7 @@ private:
     std::string hostname;
 
     std::string _temp_text;
-    std::string _temp_content_type;
+    const char* _temp_content_type;
 
     std::string path_;
     std::unique_ptr<folly::File> file_;
