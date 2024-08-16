@@ -1,0 +1,6 @@
+[submodule "deps/h2o"]
+	path = deps/h2o
+	url = https://github.com/h2o/h2o
+[submodule "deps/quicly"]
+	path = deps/quicly
+	url = https://github.com/h2o/quicly
