@@ -11,6 +11,31 @@ set_target_properties(h2o PROPERTIES EXCLUDE_FROM_ALL 1 EXCLUDE_FROM_DEFAULT_BUI
 get_target_property(LIBH2O_INCLUDE_DIRS libh2o INCLUDE_DIRECTORIES)
 get_target_property(LIBH2O_LINK_LIBS libh2o LINK_LIBRARIES)
 get_target_property(LIBH2O_SOURCES libh2o SOURCES)
+set(BROTLI_SOURCE_FILES
+        deps/h2o/deps/brotli/c/common/dictionary.c
+        deps/h2o/deps/brotli/c/dec/bit_reader.c
+        deps/h2o/deps/brotli/c/dec/decode.c
+        deps/h2o/deps/brotli/c/dec/huffman.c
+        deps/h2o/deps/brotli/c/dec/state.c
+        deps/h2o/deps/brotli/c/enc/backward_references.c
+        deps/h2o/deps/brotli/c/enc/backward_references_hq.c
+        deps/h2o/deps/brotli/c/enc/bit_cost.c
+        deps/h2o/deps/brotli/c/enc/block_splitter.c
+        deps/h2o/deps/brotli/c/enc/brotli_bit_stream.c
+        deps/h2o/deps/brotli/c/enc/cluster.c
+        deps/h2o/deps/brotli/c/enc/compress_fragment.c
+        deps/h2o/deps/brotli/c/enc/compress_fragment_two_pass.c
+        deps/h2o/deps/brotli/c/enc/dictionary_hash.c
+        deps/h2o/deps/brotli/c/enc/encode.c
+        deps/h2o/deps/brotli/c/enc/entropy_encode.c
+        deps/h2o/deps/brotli/c/enc/histogram.c
+        deps/h2o/deps/brotli/c/enc/literal_cost.c
+        deps/h2o/deps/brotli/c/enc/memory.c
+        deps/h2o/deps/brotli/c/enc/metablock.c
+        deps/h2o/deps/brotli/c/enc/static_dict.c
+        deps/h2o/deps/brotli/c/enc/utf8_util.c
+        deps/h2o/lib/handler/compress/brotli.c)
+
 
 message(STATUS "[libh2o] Include directories: ${LIBH2O_INCLUDE_DIRS}")
 message(STATUS "[libh2o] Linked libraries: ${LIBH2O_LINK_LIBS}")
@@ -33,7 +58,7 @@ find_library(LIBUV_LIBRARIES NAMES uv libuv)
 
 file(GLOB_RECURSE SRC "${CMAKE_SOURCE_DIR}/src/*.c")
 
-add_executable(${PROJECT_NAME} ${SRC} ${LIBH2O_SOURCES_MOD})
+add_executable(${PROJECT_NAME} ${SRC} ${LIBH2O_SOURCES_MOD} ${BROTLI_SOURCE_FILES})
 target_link_libraries(${PROJECT_NAME} OpenSSL::SSL ${LIBUV_LIBRARIES} ${LIBH2O_LINK_LIBS} ZLIB::ZLIB yaml)
 target_include_directories(${PROJECT_NAME} PUBLIC
         ${CMAKE_SOURCE_DIR}/include
