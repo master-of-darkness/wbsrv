@@ -18,6 +18,7 @@ static h2o_context_t ctx;
 static h2o_multithread_receiver_t libmemcached_receiver;
 static h2o_accept_ctx_t accept_ctx;
 
+
 struct rowCache {
     const char* content_type;
     const char* content_text;

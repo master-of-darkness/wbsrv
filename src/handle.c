@@ -66,6 +66,12 @@ struct st_gzip_decompress_t {
     h2o_compress_context_t *decompressor;
 };
 
+typedef struct st_wbsrv_file_handler_t wbsrv_file_handler_t;
+typedef struct st_wbsrv_sendfile_generator_t wbsrv_sendfile_generator_t;
+typedef struct st_wbsrv_specific_file_handler_t wbsrv_specific_file_handler_t;
+typedef struct st_gzip_decompress_t gzip_decompress_t;
+
+
 static const char *default_index_files[] = {"index.html", "index.htm", "index.txt", NULL};
 
 const char **wbsrv_file_default_index_files = default_index_files;
@@ -121,7 +127,7 @@ static int do_pread(h2o_sendvec_t *src, void *dst, size_t len) {
 }
 
 #if defined(__linux__)
-size_t do_sendfile(int sockfd, int filefd, off_t off, size_t len) {
+size_t do_sendfile2(int sockfd, int filefd, off_t off, size_t len) {
     off_t iooff = off;
     ssize_t ret;
     while ((ret = sendfile(sockfd, filefd, &iooff, len)) == -1 && errno == EINTR);
@@ -130,7 +136,7 @@ size_t do_sendfile(int sockfd, int filefd, off_t off, size_t len) {
     return ret;
 }
 #elif defined(__APPLE__)
-size_t do_sendfile(int sockfd, int filefd, off_t off, size_t len)
+size_t do_sendfile2(int sockfd, int filefd, off_t off, size_t len)
 {
     off_t iolen = len;
     int ret;
@@ -141,7 +147,7 @@ size_t do_sendfile(int sockfd, int filefd, off_t off, size_t len)
     return iolen;
 }
 #elif defined(__FreeBSD__)
-size_t do_sendfile(int sockfd, int filefd, off_t off, size_t len)
+size_t do_sendfile2(int sockfd, int filefd, off_t off, size_t len)
 {
     off_t outlen;
     int ret;
@@ -155,9 +161,10 @@ size_t do_sendfile(int sockfd, int filefd, off_t off, size_t len)
 #define NO_SENDFILE 1
 #endif
 #if !NO_SENDFILE
+
 static size_t sendvec_send(h2o_sendvec_t *src, int sockfd, size_t len) {
     struct st_wbsrv_sendfile_generator_t *self = (void *) src->cb_arg[0];
-    ssize_t bytes_sent = do_sendfile(sockfd, self->file.ref->fd, (off_t) src->cb_arg[1], len);
+    ssize_t bytes_sent = do_sendfile2(sockfd, self->file.ref->fd, (off_t) src->cb_arg[1], len);
     if (bytes_sent > 0) {
         src->cb_arg[1] += bytes_sent;
         src->len -= bytes_sent;
@@ -589,7 +596,7 @@ static int delegate_dynamic_request(h2o_req_t *req, h2o_iovec_t script_name, h2o
     return handler->on_req(handler, req);
 }
 
-static int try_dynamic_request(h2o_file_handler_t *self, h2o_req_t *req, char *rpath, size_t rpath_len) {
+static int try_dynamic_request(wbsrv_file_handler_t *self, h2o_req_t *req, char *rpath, size_t rpath_len) {
     /* we have full local path in {rpath,rpath_len}, and need to split it into name and path_info */
     struct stat st;
     size_t slash_at = self->real_path.len;
@@ -783,7 +790,7 @@ Close:
 }
 
 static int on_req(h2o_handler_t *_self, h2o_req_t *req) {
-    h2o_file_handler_t *self = (void *) _self;
+    wbsrv_file_handler_t *self = (void *) _self;
     char *rpath;
     size_t rpath_len, req_path_prefix;
     struct st_wbsrv_sendfile_generator_t *generator = NULL;
@@ -886,19 +893,19 @@ Opened:
 }
 
 static void on_context_init(h2o_handler_t *_self, h2o_context_t *ctx) {
-    h2o_file_handler_t *self = (void *) _self;
+    wbsrv_file_handler_t *self = (void *) _self;
 
     h2o_mimemap_on_context_init(self->mimemap, ctx);
 }
 
 static void on_context_dispose(h2o_handler_t *_self, h2o_context_t *ctx) {
-    h2o_file_handler_t *self = (void *) _self;
+    wbsrv_file_handler_t *self = (void *) _self;
 
     h2o_mimemap_on_context_dispose(self->mimemap, ctx);
 }
 
 static void on_handler_dispose(h2o_handler_t *_self) {
-    h2o_file_handler_t *self = (void *) _self;
+    wbsrv_file_handler_t *self = (void *) _self;
     size_t i;
 
     free(self->conf_path.base);
@@ -908,9 +915,9 @@ static void on_handler_dispose(h2o_handler_t *_self) {
         free(self->index_files[i].base);
 }
 
-h2o_file_handler_t *wbsrv_file_register(h2o_pathconf_t *pathconf, const char *real_path, const char **index_files,
+wbsrv_file_handler_t *wbsrv_file_register(h2o_pathconf_t *pathconf, const char *real_path, const char **index_files,
                                       h2o_mimemap_t *mimemap, int flags) {
-    h2o_file_handler_t *self;
+    wbsrv_file_handler_t *self;
     size_t i;
 
     if (index_files == NULL)
@@ -919,7 +926,7 @@ h2o_file_handler_t *wbsrv_file_register(h2o_pathconf_t *pathconf, const char *re
     /* allocate memory */
     for (i = 0; index_files[i] != NULL; ++i);
     self =
-            (void *) h2o_create_handler(pathconf, offsetof(h2o_file_handler_t, index_files[0]) + sizeof(self->
+            (void *) h2o_create_handler(pathconf, offsetof(wbsrv_file_handler_t, index_files[0]) + sizeof(self->
                 index_files[0]) * (i + 1)
     )
     ;
@@ -949,7 +956,7 @@ h2o_file_handler_t *wbsrv_file_register(h2o_pathconf_t *pathconf, const char *re
     return self;
 }
 
-h2o_mimemap_t *wbsrv_file_get_mimemap(h2o_file_handler_t *handler) {
+h2o_mimemap_t *wbsrv_file_get_mimemap(wbsrv_file_handler_t *handler) {
     return handler->mimemap;
 }
 
