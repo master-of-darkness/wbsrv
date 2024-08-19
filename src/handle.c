@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include "h2o.h"
+#include "lru_cache.h"
 
 #define MAX_BUF_SIZE 65000
 #define BOUNDARY_SIZE 20
@@ -70,6 +71,8 @@ typedef struct st_wbsrv_file_handler_t wbsrv_file_handler_t;
 typedef struct st_wbsrv_sendfile_generator_t wbsrv_sendfile_generator_t;
 typedef struct st_wbsrv_specific_file_handler_t wbsrv_specific_file_handler_t;
 typedef struct st_gzip_decompress_t gzip_decompress_t;
+
+static lru_cache_t *cache;
 
 
 static const char *default_index_files[] = {"index.html", "index.htm", "index.txt", NULL};
@@ -925,11 +928,8 @@ wbsrv_file_handler_t *wbsrv_file_register(h2o_pathconf_t *pathconf, const char *
 
     /* allocate memory */
     for (i = 0; index_files[i] != NULL; ++i);
-    self =
-            (void *) h2o_create_handler(pathconf, offsetof(wbsrv_file_handler_t, index_files[0]) + sizeof(self->
-                index_files[0]) * (i + 1)
-    )
-    ;
+    self = (void *) h2o_create_handler(pathconf, offsetof(wbsrv_file_handler_t, index_files[0]) + sizeof(self->
+                index_files[0]) * (i + 1));
 
     /* setup callbacks */
     self->super.on_context_init = on_context_init;
@@ -960,63 +960,3 @@ h2o_mimemap_t *wbsrv_file_get_mimemap(wbsrv_file_handler_t *handler) {
     return handler->mimemap;
 }
 
-static void specific_handler_on_context_init(h2o_handler_t *_self, h2o_context_t *ctx) {
-    struct st_wbsrv_specific_file_handler_t *self = (void *) _self;
-
-    if (self->mime_type->type == H2O_MIMEMAP_TYPE_DYNAMIC)
-        h2o_context_init_pathconf_context(ctx, &self->mime_type->data.dynamic.pathconf);
-}
-
-static void specific_handler_on_context_dispose(h2o_handler_t *_self, h2o_context_t *ctx) {
-    struct st_wbsrv_specific_file_handler_t *self = (void *) _self;
-
-    if (self->mime_type->type == H2O_MIMEMAP_TYPE_DYNAMIC)
-        h2o_context_dispose_pathconf_context(ctx, &self->mime_type->data.dynamic.pathconf);
-}
-
-static void specific_handler_on_dispose(h2o_handler_t *_self) {
-    struct st_wbsrv_specific_file_handler_t *self = (void *) _self;
-
-    free(self->real_path.base);
-    h2o_mem_release_shared(self->mime_type);
-}
-
-static int specific_handler_on_req(h2o_handler_t *_self, h2o_req_t *req) {
-    struct st_wbsrv_specific_file_handler_t *self = (void *) _self;
-    struct st_wbsrv_sendfile_generator_t *generator;
-    int is_dir;
-
-    /* open file (or send error or return -1) */
-    if ((generator = create_generator(req, self->real_path.base, self->real_path.len, &is_dir, self->flags)) == NULL) {
-        if (is_dir) {
-            h2o_send_error_403(req, "Access Forbidden", "access forbidden", 0);
-        } else if (errno == ENOENT) {
-            return -1;
-        } else if (errno == ENFILE || errno == EMFILE) {
-            h2o_send_error_503(req, "Service Unavailable", "please try again later", 0);
-        } else {
-            h2o_send_error_403(req, "Access Forbidden", "access forbidden", 0);
-        }
-        return 0;
-    }
-
-    return serve_with_generator(generator, req, req->path_normalized, self->real_path.base, self->real_path.len,
-                                self->mime_type);
-}
-
-h2o_handler_t *wbsrv_file_register_file(h2o_pathconf_t *pathconf, const char *real_path, h2o_mimemap_type_t *mime_type,
-                                      int flags) {
-    struct st_wbsrv_specific_file_handler_t *self = (void *) h2o_create_handler(pathconf, sizeof(*self));
-
-    self->super.on_context_init = specific_handler_on_context_init;
-    self->super.on_context_dispose = specific_handler_on_context_dispose;
-    self->super.dispose = specific_handler_on_dispose;
-    self->super.on_req = specific_handler_on_req;
-
-    self->real_path = h2o_strdup(NULL, real_path, SIZE_MAX);
-    h2o_mem_addref_shared(mime_type);
-    self->mime_type = mime_type;
-    self->flags = flags;
-
-    return &self->super;
-}

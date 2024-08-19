@@ -19,13 +19,6 @@ static h2o_multithread_receiver_t libmemcached_receiver;
 static h2o_accept_ctx_t accept_ctx;
 
 
-struct rowCache {
-    const char* content_type;
-    const char* content_text;
-};
-
-
-static const char *default_index_files[] = {"index.html", "index.htm", "index.txt", NULL};
 
 static int setup_ssl(const char *cert_file, const char *key_file, const char *ciphers) {
     SSL_load_error_strings();
