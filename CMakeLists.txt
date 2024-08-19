@@ -1,12 +1,9 @@
 cmake_minimum_required(VERSION 3.28)
-project(webproxy)
+project(wbsrv C)
 
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread -D_GNU_SOURCE")
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -fpermissive")
 
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-option(TBB_TEST OFF)
+option(BUILD_SHARED_LIBS OFF)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
@@ -30,17 +27,16 @@ foreach(item ${LIBH2O_SOURCES})
 endforeach()
 message(STATUS "[libh2o] Sources: ${LIBH2O_SOURCES_MOD}")
 
-find_package(TBB REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(ZLIB REQUIRED)
 
 find_path(LIBUV_INCLUDE_DIR NAMES uv.h)
 find_library(LIBUV_LIBRARIES NAMES uv libuv)
 
-file(GLOB_RECURSE SRC "${CMAKE_SOURCE_DIR}/src/*.cpp")
+file(GLOB_RECURSE SRC "${CMAKE_SOURCE_DIR}/src/*.c")
 
 add_executable(${PROJECT_NAME} ${SRC} ${LIBH2O_SOURCES_MOD})
-target_link_libraries(${PROJECT_NAME} OpenSSL::SSL ${LIBUV_LIBRARIES} ${LIBH2O_LINK_LIBS} ZLIB::ZLIB TBB::tbb yaml)
+target_link_libraries(${PROJECT_NAME} OpenSSL::SSL ${LIBUV_LIBRARIES} ${LIBH2O_LINK_LIBS} ZLIB::ZLIB yaml)
 target_include_directories(${PROJECT_NAME} PUBLIC
         ${CMAKE_SOURCE_DIR}/include
         ${LIBUV_INCLUDE_DIR}
