@@ -8,7 +8,6 @@
 #include <unistd.h>
 
 #include "h2o.h"
-#include "lru_cache.h"
 
 #define MAX_BUF_SIZE 65000
 #define BOUNDARY_SIZE 20
@@ -72,14 +71,13 @@ typedef struct st_wbsrv_sendfile_generator_t wbsrv_sendfile_generator_t;
 typedef struct st_wbsrv_specific_file_handler_t wbsrv_specific_file_handler_t;
 typedef struct st_gzip_decompress_t gzip_decompress_t;
 
-static lru_cache_t *cache;
-
 
 static const char *default_index_files[] = {"index.html", "index.htm", "index.txt", NULL};
 
 const char **wbsrv_file_default_index_files = default_index_files;
 
 #include "templates.h"
+
 
 static int tm_is_lessthan(struct tm *x, struct tm *y) {
 #define CMP(f)                                                                                                                     \
@@ -261,8 +259,8 @@ Error:
 }
 
 static struct st_wbsrv_sendfile_generator_t *create_generator(h2o_req_t *req, const char *path, size_t path_len,
-                                                            int *is_dir,
-                                                            int flags) {
+                                                              int *is_dir,
+                                                              int flags) {
     struct st_wbsrv_sendfile_generator_t *self;
     h2o_filecache_ref_t *fileref;
     h2o_iovec_t content_encoding = (h2o_iovec_t){NULL};
@@ -356,8 +354,9 @@ static void send_decompressed(h2o_ostream_t *_self, h2o_req_t *req, h2o_sendvec_
     h2o_ostream_send_next(&self->super, req, outbufs, outbufcnt, state);
 }
 
-static void wbsrv_do_send_file(struct st_wbsrv_sendfile_generator_t *self, h2o_req_t *req, int status, const char *reason,
-                         h2o_iovec_t mime_type, h2o_mime_attributes_t *mime_attr, int is_get) {
+static void wbsrv_do_send_file(struct st_wbsrv_sendfile_generator_t *self, h2o_req_t *req, int status,
+                               const char *reason,
+                               h2o_iovec_t mime_type, h2o_mime_attributes_t *mime_attr, int is_get) {
     /* link the request */
     self->req = req;
 
@@ -424,7 +423,8 @@ static void wbsrv_do_send_file(struct st_wbsrv_sendfile_generator_t *self, h2o_r
     }
 }
 
-int wbsrv_file_send(h2o_req_t *req, int status, const char *reason, const char *path, h2o_iovec_t mime_type, int flags) {
+int wbsrv_file_send(h2o_req_t *req, int status, const char *reason, const char *path, h2o_iovec_t mime_type,
+                    int flags) {
     struct st_wbsrv_sendfile_generator_t *self;
     int is_dir;
 
@@ -772,14 +772,14 @@ static int serve_with_generator(struct st_wbsrv_sendfile_generator_t *generator,
             generator->bytesleft = final_content_len;
         }
         wbsrv_do_send_file(generator, req, 206, "Partial Content", mime_type->data.mimetype, &h2o_mime_attributes_as_is,
-                     method_type == METHOD_IS_GET);
+                           method_type == METHOD_IS_GET);
         return 0;
     }
 
 EntireFile:
     /* return file */
     wbsrv_do_send_file(generator, req, 200, "OK", mime_type->data.mimetype, &mime_type->data.attr,
-                 method_type == METHOD_IS_GET);
+                       method_type == METHOD_IS_GET);
     return 0;
 
 NotModified:
@@ -919,7 +919,7 @@ static void on_handler_dispose(h2o_handler_t *_self) {
 }
 
 wbsrv_file_handler_t *wbsrv_file_register(h2o_pathconf_t *pathconf, const char *real_path, const char **index_files,
-                                      h2o_mimemap_t *mimemap, int flags) {
+                                          h2o_mimemap_t *mimemap, int flags) {
     wbsrv_file_handler_t *self;
     size_t i;
 
@@ -929,7 +929,9 @@ wbsrv_file_handler_t *wbsrv_file_register(h2o_pathconf_t *pathconf, const char *
     /* allocate memory */
     for (i = 0; index_files[i] != NULL; ++i);
     self = (void *) h2o_create_handler(pathconf, offsetof(wbsrv_file_handler_t, index_files[0]) + sizeof(self->
-                index_files[0]) * (i + 1));
+               index_files[0]) * (i + 1)
+    )
+    ;
 
     /* setup callbacks */
     self->super.on_context_init = on_context_init;
@@ -959,4 +961,3 @@ wbsrv_file_handler_t *wbsrv_file_register(h2o_pathconf_t *pathconf, const char *
 h2o_mimemap_t *wbsrv_file_get_mimemap(wbsrv_file_handler_t *handler) {
     return handler->mimemap;
 }
-

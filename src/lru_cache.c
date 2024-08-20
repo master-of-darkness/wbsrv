@@ -1,130 +1,205 @@
+#include<stdio.h>
+#include<stdlib.h>
+#include<string.h>
+
 #include "lru_cache.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
-// Helper function to create a new node
-static cache_node_t* lru_create_node(int key, void *value, size_t value_size) {
-    cache_node_t *node = (cache_node_t*)malloc(sizeof(cache_node_t));
-    node->key = key;
-    node->value = malloc(value_size);
-    memcpy(node->value, value, value_size);
-    node->prev = NULL;
-    node->next = NULL;
-    return node;
+LRUCache *createCache(int size) {
+    LRUCache *newCache = (LRUCache *) malloc(sizeof(LRUCache));
+    Table *table = createTable(size * 2);
+    List *list = createList(size);
+    newCache->table = table;
+    newCache->list = list;
+    return newCache;
 }
 
-// Helper function to remove a node
-static void lru_remove_node(lru_cache_t *cache, cache_node_t *node) {
-    if (node->prev) {
-        node->prev->next = node->next;
+Node *createNode(char *key, char *value) {
+    Node *newNode = (Node *) malloc(sizeof(Node));
+    newNode->key = key;
+    newNode->value = value;
+    newNode->next = NULL;
+    newNode->prev = NULL;
+    newNode->hashNext = NULL;
+    return newNode;
+}
+
+List *createList(int capacity) {
+    List *newList = (List *) malloc(sizeof(List));
+    newList->size = 0;
+    newList->capacity = capacity;
+    newList->head = newList->tail = NULL;
+    return newList;
+}
+
+Table *createTable(int capacity) {
+    Table *newhash = (Table *) malloc(sizeof(Table));
+    newhash->capacity = capacity;
+    newhash->array = (Node **) malloc(sizeof(Node) * capacity);
+    for (size_t i = 0; i < capacity; i++)
+        newhash->array[i] = NULL;
+    return newhash;
+}
+
+static size_t getHashCode(Table *table, const char *source) {
+    if (source == NULL)
+        return 0;
+    size_t hash = 0;
+    while (*source != '\0') {
+        char c = *source++;
+        int a = c - '0';
+        hash = (hash * 10) + a;
+    }
+    return hash % table->capacity;
+}
+
+void evictCache(LRUCache *cache) {
+    Table *table = cache->table;
+    List *list = cache->list;
+
+    Node *entry = list->head;
+    // return if empty
+    if (list->head == NULL)
+        return;
+    // remove head and tail if only one node
+    if (list->head == list->tail) {
+        list->head = NULL;
+        list->tail = NULL;
     } else {
-        cache->head = node->next;
+        // remove entry from list with multiple nodes
+        list->head = entry->next;
+        list->size = list->size - 1;
+        list->head->prev = NULL;
     }
 
-    if (node->next) {
-        node->next->prev = node->prev;
-    } else {
-        cache->tail = node->prev;
+    // remove from map
+    size_t hashCode = getHashCode(table, entry->key);
+    Node **indirect = &table->array[hashCode];
+    while ((*indirect) != entry)
+        indirect = &(*indirect)->next;
+    *indirect = entry->next;
+
+    free(entry);
+}
+
+void moveToFront(LRUCache *cache, char *key) {
+    Table *table = cache->table;
+    List *list = cache->list;
+
+    // return if only element in list
+    if (list->size == 1)
+        return;
+
+    size_t hashCode = getHashCode(table, key);
+    Node *curr = table->array[hashCode];
+
+    // find in hashMap
+    while (curr) {
+        if (strcmp(curr->key, key) == 0)
+            break;
+        curr = curr->hashNext;
     }
-}
+    // return if doesn't exist
+    if (curr == NULL)
+        return;
 
-// Helper function to add a node at the head
-static void lru_add_node_at_head(lru_cache_t *cache, cache_node_t *node) {
-    node->next = cache->head;
-    node->prev = NULL;
-
-    if (cache->head) {
-        cache->head->prev = node;
-    } else {
-        cache->tail = node;
+    // move curr to latest/tail of list
+    if (curr->prev == NULL) {
+        // if head in list
+        curr->prev = list->tail;
+        list->head = curr->next;
+        list->head->prev = NULL;
+        list->tail->next = curr;
+        list->tail = curr;
+        list->tail->next = NULL;
+        return;
     }
 
-    cache->head = node;
+    if (curr->next == NULL) // already latest at tail
+        return;
+
+    // if curr in middle
+    curr->next->prev = curr->prev;
+    curr->prev->next = curr->next;
+    curr->next = NULL;
+    list->tail->next = curr;
+    curr->prev = list->tail;
+    list->tail = curr;
 }
 
-// Create LRUCache
-static lru_cache_t* lru_create_cache(int capacity) {
-    lru_cache_t *cache = (lru_cache_t*)malloc(sizeof(lru_cache_t));
-    cache->capacity = capacity;
-    cache->size = 0;
-    cache->head = NULL;
-    cache->tail = NULL;
-    cache->hashTable = (cache_node_t**)calloc(capacity, sizeof(cache_node_t*));
-    return cache;
+void addToList(LRUCache *cache, Node *valNode) {
+    List *list = cache->list;
+    if (list->size == list->capacity)
+        evictCache(cache);
+
+    if (list->head == NULL) {
+        list->head = list->tail = valNode;
+        list->size = 1;
+        return;
+    }
+
+    valNode->prev = list->tail;
+    list->tail->next = valNode;
+    list->tail = valNode;
+    list->size = list->size + 1;
+    return;
 }
 
-// Get value from LRUCache
-static void* lru_get(lru_cache_t *cache, int key) {
-    cache_node_t *node = cache->hashTable[key % cache->capacity];
+int addToHash(Table *table, Node *valNode) {
+    size_t hashCode = getHashCode(table, valNode->key);
+    if (table->array[hashCode] != NULL) {
+        // check if is in hash
 
-    while (node) {
-        if (node->key == key) {
-            // Move accessed node to the head (most recently used)
-            lru_remove_node(cache, node);
-            lru_add_node_at_head(cache, node);
-            return node->value;
+        Node *curr = table->array[hashCode];
+
+        while (curr->hashNext != NULL) {
+            if (strcmp(curr->key, valNode->key) == 0) {
+                curr->value = valNode->value;
+                return 1;
+            }
+            curr = curr->hashNext;
         }
-        node = node->next;
-    }
+        // last node
+        if (strcmp(curr->key, valNode->key) == 0) {
+            curr->value = valNode->value;
+            return 1;
+        }
 
-    // Key not found
+        // add after last node
+        curr->hashNext = valNode;
+        return 0;
+    } else {
+        table->array[hashCode] = valNode;
+        return 0;
+    }
+}
+
+void put(LRUCache *cache, char *key, char *value) {
+    Node *valNode = createNode(key, value);
+
+    if (addToHash(cache->table, valNode)) // already in list
+        moveToFront(cache, valNode->key);
+    else
+        addToList(cache, valNode);
+}
+
+char *get(LRUCache *cache, char *key) {
+    Table *table = cache->table;
+    size_t hashCode = getHashCode(table, key);
+    Node *curr = table->array[hashCode];
+    while (curr) {
+        if (strcmp(curr->key, key) == 0) {
+            moveToFront(cache, key);
+            return curr->value;
+        }
+        curr = curr->hashNext;
+    }
     return NULL;
 }
 
-// Put value in LRUCache
-static void lru_put(lru_cache_t *cache, int key, void *value, size_t value_size) {
-    cache_node_t *node = cache->hashTable[key % cache->capacity];
-
-    while (node) {
-        if (node->key == key) {
-            // Update value and move node to the head
-            memcpy(node->value, value, value_size);
-            lru_remove_node(cache, node);
-            lru_add_node_at_head(cache, node);
-            return;
-        }
-        node = node->next;
+void printCache(LRUCache *cache) {
+    Node *temp = cache->list->head;
+    for (size_t i = 0; i < cache->list->size; i++) {
+        printf("%s %s \n", temp->key, temp->value);
+        temp = temp->next;
     }
-
-    // If cache is full, remove the least recently used item
-    if (cache->size == cache->capacity) {
-        cache_node_t *tail = cache->tail;
-        lru_remove_node(cache, tail);
-
-        // Remove from hash table
-        cache_node_t **hashSlot = &cache->hashTable[tail->key % cache->capacity];
-        while (*hashSlot && (*hashSlot)->key != tail->key) {
-            hashSlot = &(*hashSlot)->next;
-        }
-        if (*hashSlot) {
-            *hashSlot = (*hashSlot)->next;
-        }
-
-        free(tail->value);
-        free(tail);
-        cache->size--;
-    }
-
-    // Add new node
-    cache_node_t *newNode = lru_create_node(key, value, value_size);
-    lru_add_node_at_head(cache, newNode);
-
-    // Add to hash table
-    newNode->next = cache->hashTable[key % cache->capacity];
-    cache->hashTable[key % cache->capacity] = newNode;
-    cache->size++;
-}
-
-// Free LRUCache
-static void lru_free_cache(lru_cache_t *cache) {
-    cache_node_t *current = cache->head;
-    while (current) {
-        cache_node_t *next = current->next;
-        free(current->value);
-        free(current);
-        current = next;
-    }
-    free(cache->hashTable);
-    free(cache);
 }

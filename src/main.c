@@ -8,6 +8,7 @@
 
 #include "h2o.h"
 #include "h2o/memcached.h"
+#include "lru_cache.h"
 #include "defines.h"
 
 #define USE_HTTPS 0
@@ -17,7 +18,7 @@ static h2o_globalconf_t config;
 static h2o_context_t ctx;
 static h2o_multithread_receiver_t libmemcached_receiver;
 static h2o_accept_ctx_t accept_ctx;
-
+static LRUCache *cache;
 
 
 static int setup_ssl(const char *cert_file, const char *key_file, const char *ciphers) {
@@ -111,6 +112,10 @@ int main() {
     hostconf = h2o_config_register_host(&config, h2o_iovec_init(H2O_STRLIT("default")), 65535);
     pathconf = h2o_config_register_path(hostconf, "/", 0);
     wbsrv_file_register(pathconf, "docroot/", NULL, NULL, 0);
+    cache = createCache(128);
+    put(cache, "test", "123");
+    printf("%s\n", get(cache, "test"));
+
     if (logfh != NULL)
         h2o_access_log_register(pathconf, logfh);
 

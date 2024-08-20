@@ -1,21 +1,50 @@
 #pragma once
 
-typedef struct st_cache_node_t {
-    int key;
-    void *value;
-    struct st_cache_node_t *prev;
-    struct st_cache_node_t *next;
-} cache_node_t;
+typedef struct Node {
+    char *key;
+    char *value;
+    struct Node *next;
+    struct Node *prev;
+    struct Node *hashNext;
+} Node;
 
-typedef struct st_lru_cache_t {
+typedef struct Table {
     int capacity;
-    int size;
-    cache_node_t *head;
-    cache_node_t *tail;
-    cache_node_t **hashTable;
-} lru_cache_t;
+    Node * *array;
+} Table;
 
-typedef struct st_doc_cache_row_t {
-    const char* content_type;
-    const char* content_text;
-} cache_row_t;
+typedef struct List {
+    int size;
+    int capacity;
+    Node *head;
+    Node *tail;
+} List;
+
+typedef struct LRUCache {
+    Table *table;
+    List *list;
+} LRUCache;
+
+static size_t getHashCode(Table *table, const char *source);
+
+LRUCache *createCache(int size);
+
+Node *createNode(char *key, char *value);
+
+List *createList(int capacity);
+
+Table *createTable(int capacity);
+
+void evictCache(LRUCache *cache);
+
+void moveToFront(LRUCache *cache, char *key);
+
+void addToList(LRUCache *cache, Node *valNode);
+
+int addToHash(Table *table, Node *valNode);
+
+void put(LRUCache *cache, char *key, char *value);
+
+char *get(LRUCache *cache, char *key);
+
+void printCache(LRUCache *cache);
