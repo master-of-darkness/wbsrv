@@ -1,5 +1,6 @@
 {
-  "dependencies": [
-    "proxygen"
-  ]
+  "dependencies" : [ "proxygen", {
+    "name" : "yaml-cpp",
+    "version>=" : "0.8.0#1"
+  } ]
 }
