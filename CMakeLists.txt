@@ -8,8 +8,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 option(TBB_TEST OFF)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-
-find_package(Proxygen REQUIRED)
+find_package(proxygen CONFIG REQUIRED)
 find_package(gflags REQUIRED)
 find_package(TBB REQUIRED)
 
