@@ -25,27 +25,12 @@ Tested on **Dell XPS 13 9310** laptop with following hardware:
 - A C++20 compatible compiler (e.g., GCC, Clang)
 - Linux-based system
 - [Proxygen](https://github.com/facebook/proxygen) library and its dependencies
+#### To build
+- Vcpkg package manager
 
 ### Steps
 
-1. Clone the repository:
-    ```sh
-    git clone https://github.com/master-of-darkness/wbsrv.git
-    cd wbsrv
-    ```
-
-2. If you are going to use as daemon, you should to build project in **Release**. Build the project:
-    ```sh
-    mkdir build
-    cd build
-    cmake -DCMAKE_BUILD_TYPE=Release ..
-    make
-    ```
-
-3. Run the server:
-    ```sh
-    ./wbsrv
-    ```
+#### Under construction 
 
 ## Usage
 
