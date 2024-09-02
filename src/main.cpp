@@ -104,7 +104,7 @@ int main(int argc, char *argv[]) {
     HTTPServerOptions options;
     options.threads = static_cast<size_t>(general_config.threads);
     options.idleTimeout = std::chrono::milliseconds(60000);
-    options.shutdownOn = {SIGINT, SIGTERM};
+    options.shutdownOn = {SIGINT, SIGTERM, SIGSEGV};
     options.enableContentCompression = false;
     options.handlerFactories =
             RequestHandlerChain().addThen<StaticHandlerFactory>().build();

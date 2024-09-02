@@ -44,6 +44,7 @@ public:
 
 private:
     void readFile(folly::EventBase *evb);
+    void handleFileRead(const std::unique_ptr<proxygen::HTTPMessage>& headers);
 
     bool checkForCompletion();
 

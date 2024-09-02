@@ -13,69 +13,66 @@
 
 using namespace proxygen;
 
-typedef struct CacheRow {
-    bool operator!=(const CacheRow& rhs) const{
-        return (this->content_type == rhs.content_type) && (this->text == rhs.text);
+struct CacheRow {
+    bool operator!=(const CacheRow& rhs) const {
+        return (content_type != rhs.content_type) || (text != rhs.text);
     }
 
-    const char* content_type;
+    std::string content_type;
     std::string text;
-} CacheRow_t;
+};
 
-typedef utils::ConcurrentLRUCache<std::string, CacheRow_t>::ConstAccessor c_acc_cache;
+using CacheAccessor = utils::ConcurrentLRUCache<std::string, std::shared_ptr<CacheRow>>::ConstAccessor;
 
-
-utils::ConcurrentLRUCache<std::string, CacheRow_t> cache(256);
+utils::ConcurrentLRUCache<std::string, std::shared_ptr<CacheRow>> cache(256);
 
 void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
     error_ = false;
     vhost::const_accessor c_acc;
 
     if (auto v = vhost::list.find(c_acc, hostname); v) {
-        c_acc_cache const_acc_2;
+        CacheAccessor cache_acc;
         path_ = *c_acc + '/' + headers->getPathAsStringPiece().subpiece(1).str();
 
-        if (auto g = cache.find(const_acc_2, path_); g) {
-            auto text = *const_acc_2;
+        if (cache.find(cache_acc, path_)) {
+            const auto& cache_row = *cache_acc;
             ResponseBuilder(downstream_)
-                    .status(STATUS_200)
-                    .header("Content-Type", text.content_type)
-                    .body(text.text)
-                    .sendWithEOM();
+                .status(STATUS_200)
+                .header("Content-Type", cache_row->content_type)
+                .body(cache_row->text)
+                .sendWithEOM();
         } else {
-            try {
-                file_ = std::make_unique<folly::File>(path_);
-            } catch (const std::system_error& ex) {
-                ResponseBuilder(downstream_)
-                        .status(STATUS_404)
-                        .body(folly::to<std::string>("Could not find ",
-                                                     headers->getPathAsStringPiece(),
-                                                     " ex=",
-                                                     folly::exceptionStr(ex)))
-                        .sendWithEOM();
-                return;
-            }
-
-            _temp_content_type = utils::getContentType(path_);
-
-            ResponseBuilder(downstream_)
-                    .status(STATUS_200)
-                    .header("Content-Type", _temp_content_type)
-                    .send();
-
-            // use a CPU executor since read(2) of a file can block
-            readFileScheduled_ = true;
-            folly::getUnsafeMutableGlobalCPUExecutor()->add(
-                    std::bind(&StaticHandler::readFile,
-                              this,
-                              folly::EventBaseManager::get()->getEventBase()));
+            handleFileRead(headers);
         }
     } else {
         ResponseBuilder(downstream_)
-                .status(STATUS_400)
-                .body("Bad request")
-                .sendWithEOM();
+            .status(STATUS_400)
+            .body("Bad request")
+            .sendWithEOM();
     }
+}
+
+void StaticHandler::handleFileRead(const std::unique_ptr<HTTPMessage>& headers) {
+    try {
+        file_ = std::make_unique<folly::File>(path_);
+    } catch (const std::system_error& ex) {
+        ResponseBuilder(downstream_)
+            .status(STATUS_404)
+            .body(folly::to<std::string>("Could not find ", headers->getPathAsStringPiece(), " ex=", folly::exceptionStr(ex)))
+            .sendWithEOM();
+        return;
+    }
+
+    _temp_content_type = utils::getContentType(path_);
+    ResponseBuilder(downstream_).status(STATUS_200).header("Content-Type", _temp_content_type).send();
+
+    // Use a CPU executor since read(2) of a file can block
+    readFileScheduled_ = true;
+    folly::getUnsafeMutableGlobalCPUExecutor()->add(
+    std::bind(&StaticHandler::readFile,
+              this,
+              folly::EventBaseManager::get()->getEventBase())
+              );
 }
 
 void StaticHandler::readFile(folly::EventBase* evb) {
@@ -87,9 +84,6 @@ void StaticHandler::readFile(folly::EventBase* evb) {
         auto rc = folly::readNoInt(file_->fd(), data.first, data.second);
         if (rc < 0) {
             // error
-#ifdef DEBUG
-            VLOG(4) << "Read error=" << rc;
-#endif
             file_.reset();
             evb->runInEventBaseThread([this] {
                 LOG(ERROR) << "Error reading file";
@@ -99,13 +93,9 @@ void StaticHandler::readFile(folly::EventBase* evb) {
         } else if (rc == 0) {
             // done
             file_.reset();
-#ifdef DEBUG
-            VLOG(4) << "Read EOF";
-#endif
-
             evb->runInEventBaseThread([this] {
                 if (!error_) {
-                    cache.insert(path_, CacheRow_t{_temp_content_type, _temp_text});
+                    cache.insert(path_, std::make_shared<CacheRow>(_temp_content_type, _temp_text));
                     ResponseBuilder(downstream_).sendWithEOM();
                 }
             });
@@ -125,9 +115,6 @@ void StaticHandler::readFile(folly::EventBase* evb) {
     evb->runInEventBaseThread([this] {
         readFileScheduled_ = false;
         if (!checkForCompletion() && !paused_) {
-#ifdef DEBUG
-            VLOG(4) << "Resuming deferred readFile";
-#endif
             onEgressResumed();
         }
     });
@@ -135,16 +122,10 @@ void StaticHandler::readFile(folly::EventBase* evb) {
 
 void StaticHandler::onEgressPaused() noexcept {
     // This will terminate readFile soon
-#ifdef DEBUG
-    VLOG(4) << "StaticHandler paused";
-#endif
     paused_ = true;
 }
 
 void StaticHandler::onEgressResumed() noexcept {
-#ifdef DEBUG
-    VLOG(4) << "StaticHandler resumed";
-#endif
     paused_ = false;
     // If readFileScheduled_, it will reschedule itself
     if (!readFileScheduled_ && file_) {
@@ -153,10 +134,6 @@ void StaticHandler::onEgressResumed() noexcept {
                 std::bind(&StaticHandler::readFile,
                           this,
                           folly::EventBaseManager::get()->getEventBase()));
-    } else {
-#ifdef DEBUG
-        VLOG(4) << "Deferred scheduling readFile";
-#endif
     }
 }
 
@@ -186,9 +163,6 @@ void StaticHandler::onError(ProxygenError /*err*/) noexcept {
 
 bool StaticHandler::checkForCompletion() {
     if (finished_ && !readFileScheduled_) {
-#ifdef DEBUG
-        VLOG(4) << "deleting StaticHandler";
-#endif
         delete this;
         return true;
     }
