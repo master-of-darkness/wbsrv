@@ -1,34 +1,38 @@
+#pragma once
+
 #include <string>
 #include <utility>
+#include <vector>
 
-namespace Config {
+namespace config {
 
-    class General {
+    class general {
     public:
-        explicit General(std::string path) {
-            path_ = path;
+        explicit general(std::string path) {
+            path_ = std::move(path);
         }
 
-        bool Load();
+        bool load();
 
         int threads = 0;
     private:
         std::string path_;
     };
 
-    class VHost {
+    class vhost {
     public:
-        explicit VHost(std::string path) {
+        explicit vhost(std::string path) {
             path_ = std::move(path);
         }
 
-        bool Load();
+        bool load();
 
         std::string private_key;
         std::string cert;
         std::string password;
         std::string hostname;
         std::string web_dir;
+        std::vector<std::string> index_pages; //name, cgi (true : false)
         bool ssl = false;
 
         int port = 80;

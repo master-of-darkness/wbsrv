@@ -3,9 +3,9 @@
 
 #include <yaml-cpp/yaml.h>
 
-using namespace Config;
+using namespace config;
 
-bool VHost::Load() {
+bool vhost::load() {
     YAML::Node config = YAML::LoadFile(this->path_);
     if (!config.IsNull()) {
         this->web_dir = config["www_dir"].as<std::string>();
@@ -15,7 +15,7 @@ bool VHost::Load() {
         this->cert = config["certificate"].as<std::string>();
         this->private_key = config["private_key"].as<std::string>();
         this->password = config["password"].as<std::string>();
-
+        this->index_pages = config["index_page"].as<std::vector<std::string>>();
         return true;
     }
     return false;

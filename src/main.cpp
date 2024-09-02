@@ -91,9 +91,9 @@ int main(int argc, char *argv[]) {
     close(STDERR_FILENO);
 #endif
 
-    Config::General general_config(CONFIG_DIR);
+    config::general general_config(CONFIG_DIR);
 
-    if (!general_config.Load())
+    if (!general_config.load())
         return -1;
 
     std::vector<HTTPServer::IPConfig> IPs;

@@ -3,9 +3,9 @@
 
 #include <yaml-cpp/yaml.h>
 
-using namespace Config;
+using namespace config;
 
-bool General::Load() {
+bool general::load() {
     YAML::Node config = YAML::LoadFile(this->path_ + "/server.yaml");
     if (!config.IsNull()) {
         this->threads = config["threads"].as<int>();

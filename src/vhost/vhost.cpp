@@ -9,8 +9,8 @@ utils::ConcurrentLRUCache<std::string, std::string> vhost::list(256);
 bool vhost::load(std::vector<proxygen::HTTPServer::IPConfig> &config) {
     for (const auto &i: std::filesystem::directory_iterator(std::string(CONFIG_DIR) + "/hosts")) {
         if (i.path().extension() == ".yaml") {
-            Config::VHost host(i.path().string());
-            if (host.Load()) {
+            config::vhost host(i.path().string());
+            if (host.load()) {
                 list.insert(host.hostname + ':' + std::to_string(host.port), host.web_dir);
                 proxygen::HTTPServer::IPConfig vhost(folly::SocketAddress(host.hostname, host.port, true), proxygen::HTTPServer::Protocol::HTTP);
 
