@@ -1,4 +1,4 @@
-#include "utils/utils.h"
+#include "utils.h"
 
 constexpr std::pair<const char *, const char *> contentTypes[] = {
         {".html", "text/html"},

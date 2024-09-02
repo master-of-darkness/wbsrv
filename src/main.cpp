@@ -14,8 +14,8 @@
 
 #include "handler.h"
 #include "defines.h"
-#include "config/config.h"
-#include "vhost/vhost.h"
+#include "config.h"
+#include "vhost.h"
 
 using namespace proxygen;
 

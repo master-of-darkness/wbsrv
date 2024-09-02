@@ -8,8 +8,8 @@
 
 #include "handler.h"
 #include "defines.h"
-#include "utils/utils.h"
-#include "vhost/vhost.h"
+#include "utils.h"
+#include "vhost.h"
 
 using namespace proxygen;
 

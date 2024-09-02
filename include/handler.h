@@ -6,14 +6,15 @@
 #include <folly/Memory.h>
 #include <proxygen/httpserver/RequestHandler.h>
 
-#include "utils/utils.h"
+#include "utils.h"
 
 namespace proxygen {
     class ResponseHandler;
 }
 
 struct VHost {
-    VHost(std::string v1, std::string v2) : host(std::move(v1)), web_dir(std::move(v2)) {};
+    VHost(std::string v1, std::string v2) : host(std::move(v1)), web_dir(std::move(v2)) {
+    };
 
     std::string host;
     std::string web_dir;
@@ -23,10 +24,11 @@ typedef VHost VHost;
 
 class StaticHandler : public proxygen::RequestHandler {
 public:
-    explicit StaticHandler(std::string hostname): hostname(std::move(hostname)) {};
+    explicit StaticHandler(std::string hostname): hostname(std::move(hostname)) {
+    };
 
     void onRequest(
-            std::unique_ptr<proxygen::HTTPMessage> headers) noexcept override;
+        std::unique_ptr<proxygen::HTTPMessage> headers) noexcept override;
 
     void onBody(std::unique_ptr<folly::IOBuf> body) noexcept override;
 
@@ -44,14 +46,15 @@ public:
 
 private:
     void readFile(folly::EventBase *evb);
-    void handleFileRead(const std::unique_ptr<proxygen::HTTPMessage>& headers);
+
+    void handleFileRead(const std::unique_ptr<proxygen::HTTPMessage> &headers);
 
     bool checkForCompletion();
 
     std::string hostname;
 
     std::string _temp_text;
-    const char* _temp_content_type;
+    const char *_temp_content_type;
 
     std::string path_;
     std::unique_ptr<folly::File> file_;

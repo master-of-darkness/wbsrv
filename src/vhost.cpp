@@ -1,8 +1,8 @@
 #include <filesystem>
 
-#include "vhost/vhost.h"
+#include "vhost.h"
 #include "defines.h"
-#include "config/config.h"
+#include "config.h"
 
 utils::ConcurrentLRUCache<std::string, std::string> vhost::list(256);
 
