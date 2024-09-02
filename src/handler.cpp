@@ -13,23 +13,26 @@
 
 using namespace proxygen;
 
-struct CacheRow {
+typedef struct CacheRow {
     bool operator!=(const CacheRow& rhs) const{
         return (this->content_type == rhs.content_type) && (this->text == rhs.text);
     }
 
     const char* content_type;
-    const char* text;
-};
+    std::string text;
+} CacheRow_t;
 
-utils::ConcurrentLRUCache<std::string, CacheRow> cache(256);
+typedef utils::ConcurrentLRUCache<std::string, CacheRow_t>::ConstAccessor c_acc_cache;
+
+
+utils::ConcurrentLRUCache<std::string, CacheRow_t> cache(256);
 
 void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
     error_ = false;
     vhost::const_accessor c_acc;
-    utils::ConcurrentLRUCache<std::string, CacheRow>::ConstAccessor const_acc_2;
 
     if (auto v = vhost::list.find(c_acc, hostname); v) {
+        c_acc_cache const_acc_2;
         path_ = *c_acc + '/' + headers->getPathAsStringPiece().subpiece(1).str();
 
         if (auto g = cache.find(const_acc_2, path_); g) {
@@ -72,7 +75,6 @@ void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
                 .status(STATUS_400)
                 .body("Bad request")
                 .sendWithEOM();
-        return;
     }
 }
 
@@ -103,7 +105,7 @@ void StaticHandler::readFile(folly::EventBase* evb) {
 
             evb->runInEventBaseThread([this] {
                 if (!error_) {
-                    cache.insert(path_, CacheRow{_temp_content_type, _temp_text.data()});
+                    cache.insert(path_, CacheRow_t{_temp_content_type, _temp_text});
                     ResponseBuilder(downstream_).sendWithEOM();
                 }
             });

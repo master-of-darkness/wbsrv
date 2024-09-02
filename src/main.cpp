@@ -113,7 +113,7 @@ int main(int argc, char *argv[]) {
     auto diskIOThreadPool = std::make_shared<folly::CPUThreadPoolExecutor>(
             general_config.threads,
             std::make_shared<folly::NamedThreadFactory>("StaticDiskIOThread"));
-    folly::setUnsafeMutableGlobalCPUExecutor(diskIOThreadPool);
+    setUnsafeMutableGlobalCPUExecutor(diskIOThreadPool);
 
     HTTPServer server(std::move(options));
     server.bind(IPs);

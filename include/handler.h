@@ -55,7 +55,7 @@ private:
     std::string path_;
     std::unique_ptr<folly::File> file_;
     bool readFileScheduled_{false};
-    bool paused_{false};
+    std::atomic<bool> paused_{false};
     bool finished_{false};
-    bool error_{false};
+    std::atomic<bool> error_{false};
 };
