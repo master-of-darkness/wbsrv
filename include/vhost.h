@@ -5,7 +5,12 @@
 #include "utils.h"
 
 namespace vhost {
-    extern utils::ConcurrentLRUCache<std::string, std::string> list;
-    typedef utils::ConcurrentLRUCache<std::string, std::string>::ConstAccessor const_accessor;
+    typedef struct vinfo_t {
+        std::string web_dir;
+        std::vector<std::string> index_pages;
+    } vinfo;
+
+    extern utils::ConcurrentLRUCache<std::string, vinfo> list;
+    typedef utils::ConcurrentLRUCache<std::string, vinfo>::ConstAccessor const_accessor;
     bool load(std::vector<proxygen::HTTPServer::IPConfig> &config);
 }

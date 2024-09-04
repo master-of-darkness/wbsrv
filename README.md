@@ -53,7 +53,7 @@ private_key: "/path/to/key" # .key extension
 password: "/path/to/file/with/password" # or if there is no password leave it blank
 port: 11001
 ssl: true # false if you don't want to use secure connection
-
+index_page: ['index.html'] # default filename if no exact file specified in request
 ```
 
 ## Dependencies

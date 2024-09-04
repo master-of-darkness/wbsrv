@@ -29,11 +29,25 @@ utils::ConcurrentLRUCache<std::string, std::shared_ptr<CacheRow>> cache(256);
 void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
     error_ = false;
     vhost::const_accessor c_acc;
+    std::string requested_path = headers->getPath();
 
     if (auto v = vhost::list.find(c_acc, hostname); v) {
         CacheAccessor cache_acc;
-        path_ = *c_acc + '/' + headers->getPathAsStringPiece().subpiece(1).str();
+        // Construct the full path using the web directory and requested path
+        path_ = c_acc->web_dir + '/' + requested_path;
 
+        // If the requested path is a directory, attempt to find a default page
+        if (std::filesystem::is_directory(path_)) {
+            for (const auto& index_page : c_acc->index_pages) {
+                std::string index_path = path_ + '/' + index_page;
+                if (std::filesystem::exists(index_path)) {
+                    path_ = index_path;  // Use the found index page
+                    break;
+                }
+            }
+        }
+
+        // Check if the path is already cached
         if (cache.find(cache_acc, path_)) {
             const auto& cache_row = *cache_acc;
             ResponseBuilder(downstream_)
@@ -42,7 +56,7 @@ void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
                 .body(cache_row->text)
                 .sendWithEOM();
         } else {
-            handleFileRead(headers);
+            handleFileRead(headers); // Handle reading the file if not in cache
         }
     } else {
         ResponseBuilder(downstream_)

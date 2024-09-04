@@ -4,14 +4,14 @@
 #include "defines.h"
 #include "config.h"
 
-utils::ConcurrentLRUCache<std::string, std::string> vhost::list(256);
+utils::ConcurrentLRUCache<std::string, vhost::vinfo> vhost::list(256);
 
 bool vhost::load(std::vector<proxygen::HTTPServer::IPConfig> &config) {
     for (const auto &i: std::filesystem::directory_iterator(std::string(CONFIG_DIR) + "/hosts")) {
         if (i.path().extension() == ".yaml") {
             config::vhost host(i.path().string());
             if (host.load()) {
-                list.insert(host.hostname + ':' + std::to_string(host.port), host.web_dir);
+                list.insert(host.hostname + ':' + std::to_string(host.port), vinfo(host.web_dir, host.index_pages));
                 proxygen::HTTPServer::IPConfig vhost(folly::SocketAddress(host.hostname, host.port, true), proxygen::HTTPServer::Protocol::HTTP);
 
                 if (host.ssl) {
