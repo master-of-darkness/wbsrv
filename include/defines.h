@@ -4,3 +4,5 @@
 #define CONFIG_DIR "/etc/wbsrv/"
 #define DAEMON_NAME "webserver"
 #define DEFAULTPAGE_FILENAME "index.html"
+#define VERSION "0.1"
+#define NAME_N_VERSION "wbsrv 0.1"

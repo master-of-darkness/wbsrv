@@ -10,8 +10,9 @@
 #include <fizz/server/CertManager.h>
 #include <sys/stat.h>
 #include <syslog.h>
+#include <sapi/embed/php_embed.h>
 
-
+#include "php_sapi.h"
 #include "handler.h"
 #include "defines.h"
 #include "config.h"
@@ -20,6 +21,9 @@
 using namespace proxygen;
 
 using folly::SocketAddress;
+
+EmbedPHP php_embed;
+
 
 class StaticHandlerFactory : public RequestHandlerFactory {
 public:
@@ -30,13 +34,14 @@ public:
     }
 
     RequestHandler *onRequest(RequestHandler *, HTTPMessage *b) noexcept override {
-        return new StaticHandler(b->getHeaders().getSingleOrEmpty(HTTP_HEADER_HOST));
+        return new StaticHandler(b->getHeaders().getSingleOrEmpty(HTTP_HEADER_HOST), php_embed);
     }
 };
 
-int main(int argc, char *argv[]) {
-    auto _ = folly::Init(&argc, &argv, true);
 
+int main(int argc, char *argv[]) {
+
+    auto _ = folly::Init(&argc, &argv, true);
 
 #ifndef DEBUG
     //thx for alexdlaird
@@ -92,12 +97,10 @@ int main(int argc, char *argv[]) {
 #endif
 
     config::general general_config(CONFIG_DIR);
-
     if (!general_config.load())
         return -1;
 
     std::vector<HTTPServer::IPConfig> IPs;
-
     if(!vhost::load(IPs))
         return -1;
 

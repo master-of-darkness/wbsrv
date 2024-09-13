@@ -32,7 +32,12 @@ namespace config {
         std::string password;
         std::string hostname;
         std::string web_dir;
-        std::vector<std::string> index_pages; //name, cgi (true : false)
+        std::vector<std::string> index_pages;
+        std::vector<std::string> cgi_extensions;
+        std::string cgi_ip;
+        int cgi_port = -1;
+
+
         bool ssl = false;
 
         int port = 80;

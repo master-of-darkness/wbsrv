@@ -5,16 +5,17 @@
 #include <proxygen/httpserver/ResponseBuilder.h>
 #include <filesystem>
 #include <utility>
+#include <fastcgi.h>
 
-#include "handler.h"
 #include "defines.h"
 #include "utils.h"
 #include "vhost.h"
+#include "handler.h"
 
 using namespace proxygen;
 
 struct CacheRow {
-    bool operator!=(const CacheRow& rhs) const {
+    bool operator!=(const CacheRow &rhs) const {
         return (content_type != rhs.content_type) || (text != rhs.text);
     }
 
@@ -22,26 +23,25 @@ struct CacheRow {
     std::string text;
 };
 
-using CacheAccessor = utils::ConcurrentLRUCache<std::string, std::shared_ptr<CacheRow>>::ConstAccessor;
+using CacheAccessor = utils::ConcurrentLRUCache<std::string, std::shared_ptr<CacheRow> >::ConstAccessor;
 
-utils::ConcurrentLRUCache<std::string, std::shared_ptr<CacheRow>> cache(256);
+utils::ConcurrentLRUCache<std::string, std::shared_ptr<CacheRow> > cache(256);
 
 void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
     error_ = false;
-    vhost::const_accessor c_acc;
     std::string requested_path = headers->getPath();
-
-    if (auto v = vhost::list.find(c_acc, hostname); v) {
+    vhost::const_accessor vhost_accessor;
+    if (auto v = vhost::list.find(vhost_accessor, hostname); v) {
         CacheAccessor cache_acc;
         // Construct the full path using the web directory and requested path
-        path_ = c_acc->web_dir + '/' + requested_path;
+        path_ = vhost_accessor->web_dir + '/' + requested_path;
 
         // If the requested path is a directory, attempt to find a default page
         if (std::filesystem::is_directory(path_)) {
-            for (const auto& index_page : c_acc->index_pages) {
+            for (const auto &index_page: vhost_accessor->index_pages) {
                 std::string index_path = path_ + '/' + index_page;
                 if (std::filesystem::exists(index_path)) {
-                    path_ = index_path;  // Use the found index page
+                    path_ = index_path; // Use the found index page
                     break;
                 }
             }
@@ -49,31 +49,42 @@ void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
 
         // Check if the path is already cached
         if (cache.find(cache_acc, path_)) {
-            const auto& cache_row = *cache_acc;
+            const auto &cache_row = *cache_acc;
             ResponseBuilder(downstream_)
-                .status(STATUS_200)
-                .header("Content-Type", cache_row->content_type)
-                .body(cache_row->text)
-                .sendWithEOM();
+                    .status(STATUS_200)
+                    .header("Content-Type", cache_row->content_type)
+                    .body(cache_row->text)
+                    .sendWithEOM();
         } else {
-            handleFileRead(headers); // Handle reading the file if not in cache
+            if (vhost_accessor->fastcgi_enable) {
+                for (const std::string &cgi_ext: vhost_accessor->cgi_extensions) {
+                    if (path_.ends_with(cgi_ext)) {
+                        requestFastCgi(vhost_accessor->cgi_host, vhost_accessor->cgi_port,
+                                       folly::EventBaseManager::get()->getEventBase());
+                        return;
+                    }
+                }
+            }
+
+            handleFileRead(headers); // Handle reading the file if not in cache and not in cgi_exts
         }
     } else {
         ResponseBuilder(downstream_)
-            .status(STATUS_400)
-            .body("Bad request")
-            .sendWithEOM();
+                .status(STATUS_400)
+                .body("Bad request")
+                .sendWithEOM();
     }
 }
 
-void StaticHandler::handleFileRead(const std::unique_ptr<HTTPMessage>& headers) {
+void StaticHandler::handleFileRead(const std::unique_ptr<HTTPMessage> &headers) {
     try {
         file_ = std::make_unique<folly::File>(path_);
-    } catch (const std::system_error& ex) {
+    } catch (const std::system_error &ex) {
         ResponseBuilder(downstream_)
-            .status(STATUS_404)
-            .body(folly::to<std::string>("Could not find ", headers->getPathAsStringPiece(), " ex=", folly::exceptionStr(ex)))
-            .sendWithEOM();
+                .status(STATUS_404)
+                .body(folly::to<std::string>("Could not find ", headers->getPathAsStringPiece(), " ex=",
+                                             folly::exceptionStr(ex)))
+                .sendWithEOM();
         return;
     }
 
@@ -83,13 +94,26 @@ void StaticHandler::handleFileRead(const std::unique_ptr<HTTPMessage>& headers) 
     // Use a CPU executor since read(2) of a file can block
     readFileScheduled_ = true;
     folly::getUnsafeMutableGlobalCPUExecutor()->add(
-    std::bind(&StaticHandler::readFile,
-              this,
-              folly::EventBaseManager::get()->getEventBase())
-              );
+        std::bind(&StaticHandler::readFile,
+                  this,
+                  folly::EventBaseManager::get()->getEventBase())
+    );
 }
 
-void StaticHandler::readFile(folly::EventBase* evb) {
+void StaticHandler::requestFastCgi(const std::string &h, int p, folly::EventBase *evb) {
+    evb->runInEventBaseThread([this] {
+        std::string a;
+        php_embed_.executeScript(path_, a);
+
+        ResponseBuilder(downstream_)
+                .status(STATUS_404)
+                .body(a)
+                .sendWithEOM();
+    });
+    }
+
+
+void StaticHandler::readFile(folly::EventBase *evb) {
     folly::IOBufQueue buf(folly::IOBufQueue::cacheChainLength());
 
     while (file_ && !paused_) {
@@ -145,9 +169,9 @@ void StaticHandler::onEgressResumed() noexcept {
     if (!readFileScheduled_ && file_) {
         readFileScheduled_ = true;
         folly::getUnsafeMutableGlobalCPUExecutor()->add(
-                std::bind(&StaticHandler::readFile,
-                          this,
-                          folly::EventBaseManager::get()->getEventBase()));
+            std::bind(&StaticHandler::readFile,
+                      this,
+                      folly::EventBaseManager::get()->getEventBase()));
     }
 }
 
@@ -182,4 +206,3 @@ bool StaticHandler::checkForCompletion() {
     }
     return false;
 }
-

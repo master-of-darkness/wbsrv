@@ -8,6 +8,7 @@
 - **Scalability:** Easily scales with your infrastructure needs.
 - **Ease of Use:** Simple configuration and deployment process.
 - **Cache system**: Least Recently Used algorithm of caching allows to store pages in memory
+- **PHP**: Implemented with Embed SAPI 
 ## Benchmarks results
 
 Tested on **Dell XPS 13 9310** laptop with following hardware:
@@ -60,3 +61,7 @@ index_page: ['index.html'] # default filename if no exact file specified in requ
 - [Proxygen](https://github.com/facebook/proxygen)
 - [yaml-cpp](https://github.com/jbeder/yaml-cpp)
 - [oneTBB](https://github.com/oneapi-src/oneTBB)
+
+In near future:
+- php embed module setting
+- improve include structure

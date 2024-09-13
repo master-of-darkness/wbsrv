@@ -1,8 +1,10 @@
 #include <filesystem>
 
+#include "fastcgi.h"
 #include "vhost.h"
 #include "defines.h"
 #include "config.h"
+
 
 utils::ConcurrentLRUCache<std::string, vhost::vinfo> vhost::list(256);
 
@@ -11,7 +13,6 @@ bool vhost::load(std::vector<proxygen::HTTPServer::IPConfig> &config) {
         if (i.path().extension() == ".yaml") {
             config::vhost host(i.path().string());
             if (host.load()) {
-                list.insert(host.hostname + ':' + std::to_string(host.port), vinfo(host.web_dir, host.index_pages));
                 proxygen::HTTPServer::IPConfig vhost(folly::SocketAddress(host.hostname, host.port, true), proxygen::HTTPServer::Protocol::HTTP);
 
                 if (host.ssl) {
@@ -20,6 +21,26 @@ bool vhost::load(std::vector<proxygen::HTTPServer::IPConfig> &config) {
                     cert.clientVerification = folly::SSLContext::VerifyClientCertificate::DO_NOT_REQUEST;
                     vhost.sslConfigs.push_back(cert);
                     vhost.sslConfigs[0].isDefault = true;
+                }
+
+                if (!host.cgi_ip.empty() && host.cgi_port != -1 && !host.cgi_ip.empty()) {
+
+                    list.insert(host.hostname + ':' + std::to_string(host.port),
+                        vinfo(
+                            host.web_dir,
+                            host.index_pages,
+                            true,
+                            host.cgi_extensions,
+                            host.cgi_ip,
+                            host.cgi_port
+                            ));
+                } else {
+                    list.insert(host.hostname + ':' + std::to_string(host.port),
+                        vinfo(
+                            host.web_dir,
+                            host.index_pages,
+                            false
+                            ));
                 }
 
                 config.push_back(vhost);
