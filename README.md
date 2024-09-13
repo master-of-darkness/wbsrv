@@ -65,3 +65,7 @@ index_page: ['index.html'] # default filename if no exact file specified in requ
 In near future:
 - php embed module setting
 - improve include structure
+- create php core configuration directives
+- temp remove fastcgi from config
+- file upload support
+- cmake php auto detect dev headers and libphp

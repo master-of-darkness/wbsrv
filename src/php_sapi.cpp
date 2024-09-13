@@ -14,8 +14,9 @@ static size_t embed_ub_write(const char *str, size_t str_length){
 EmbedPHP::EmbedPHP() {
     int argc = 0;
     char **argv = nullptr;
+    php_embed_module.name = "PHP SAPI Module for WBSRV";
+    php_embed_module.pretty_name = "WBSRV PHP SAPI";
     php_embed_module.ub_write = embed_ub_write;
-
     php_embed_init(argc, argv);  // Initialize PHP
 }
 
