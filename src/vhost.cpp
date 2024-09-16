@@ -12,7 +12,7 @@ bool vhost::load(std::vector<proxygen::HTTPServer::IPConfig> &config) {
         if (i.path().extension() == ".yaml") {
             config::vhost host(i.path().string());
             if (host.load()) {
-                proxygen::HTTPServer::IPConfig vhost(folly::SocketAddress(/*host.hostname*/"0.0.0.0", host.port, true),
+                proxygen::HTTPServer::IPConfig vhost(folly::SocketAddress("0.0.0.0", host.port, false),
                                                      proxygen::HTTPServer::Protocol::HTTP);
 
                 if (host.ssl) {

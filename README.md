@@ -69,3 +69,4 @@ In near future:
 - temp remove fastcgi from config
 - file upload support
 - cmake php auto detect dev headers and libphp
+- one-time php_embed initialization
