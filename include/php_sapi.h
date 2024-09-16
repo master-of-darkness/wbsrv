@@ -1,5 +1,5 @@
 #pragma once
 
 namespace EmbedPHP {
-    void executeScript(std::string path, std::string &retval);
+    void executeScript(const std::string &path, std::string &retval);
 }
