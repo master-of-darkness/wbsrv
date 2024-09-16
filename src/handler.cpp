@@ -1,16 +1,11 @@
-#include <folly/FileUtil.h>
-#include <folly/executors/GlobalExecutor.h>
-#include <folly/io/async/EventBaseManager.h>
-#include <proxygen/httpserver/RequestHandler.h>
 #include <proxygen/httpserver/ResponseBuilder.h>
 #include <filesystem>
-#include <utility>
-#include <fastcgi.h>
 
 #include "defines.h"
 #include "utils.h"
 #include "vhost.h"
 #include "handler.h"
+#include "php_sapi.h"
 
 using namespace proxygen;
 
@@ -103,14 +98,14 @@ void StaticHandler::handleFileRead(const std::unique_ptr<HTTPMessage> &headers) 
 void StaticHandler::requestFastCgi(const std::string &h, int p, folly::EventBase *evb) {
     evb->runInEventBaseThread([this] {
         std::string a;
-        php_embed_.executeScript(path_, a);
+        EmbedPHP::executeScript(path_, a);
 
         ResponseBuilder(downstream_)
                 .status(STATUS_404)
                 .body(a)
                 .sendWithEOM();
     });
-    }
+}
 
 
 void StaticHandler::readFile(folly::EventBase *evb) {

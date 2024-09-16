@@ -1,18 +1,8 @@
+#include <folly/init/Init.h>
 #include <folly/executors/CPUThreadPoolExecutor.h>
 #include <folly/executors/GlobalExecutor.h>
-#include <folly/init/Init.h>
-#include <folly/io/async/EventBaseManager.h>
-#include <folly/portability/GFlags.h>
-#include <folly/portability/Unistd.h>
-#include <proxygen/httpserver/HTTPServer.h>
-#include <proxygen/httpserver/RequestHandlerFactory.h>
-#include <filesystem>
-#include <fizz/server/CertManager.h>
-#include <sys/stat.h>
 #include <syslog.h>
-#include <sapi/embed/php_embed.h>
 
-#include "php_sapi.h"
 #include "handler.h"
 #include "defines.h"
 #include "config.h"
@@ -21,9 +11,6 @@
 using namespace proxygen;
 
 using folly::SocketAddress;
-
-EmbedPHP php_embed;
-
 
 class StaticHandlerFactory : public RequestHandlerFactory {
 public:
@@ -34,13 +21,12 @@ public:
     }
 
     RequestHandler *onRequest(RequestHandler *, HTTPMessage *b) noexcept override {
-        return new StaticHandler(b->getHeaders().getSingleOrEmpty(HTTP_HEADER_HOST), php_embed);
+        return new StaticHandler(b->getHeaders().getSingleOrEmpty(HTTP_HEADER_HOST));
     }
 };
 
 
 int main(int argc, char *argv[]) {
-
     auto _ = folly::Init(&argc, &argv, true);
 
 #ifndef DEBUG
@@ -101,7 +87,7 @@ int main(int argc, char *argv[]) {
         return -1;
 
     std::vector<HTTPServer::IPConfig> IPs;
-    if(!vhost::load(IPs))
+    if (!vhost::load(IPs))
         return -1;
 
     HTTPServerOptions options;
@@ -114,8 +100,8 @@ int main(int argc, char *argv[]) {
     options.h2cEnabled = true;
 
     auto diskIOThreadPool = std::make_shared<folly::CPUThreadPoolExecutor>(
-            general_config.threads,
-            std::make_shared<folly::NamedThreadFactory>("StaticDiskIOThread"));
+        general_config.threads,
+        std::make_shared<folly::NamedThreadFactory>("StaticDiskIOThread"));
     setUnsafeMutableGlobalCPUExecutor(diskIOThreadPool);
 
     HTTPServer server(std::move(options));

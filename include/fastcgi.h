@@ -5,7 +5,6 @@
 #include <map>
 
 namespace fastcgi {
-
     inline unsigned int toUnsignedByte(int value) {
         return static_cast<unsigned int>(value) & 0xff;
     }
@@ -55,32 +54,39 @@ namespace fastcgi {
 
     class Client {
     public:
-        Client(const std::string& listenAddress, int port);
-        Client(const std::string& listenAddress);
+        Client(const std::string &listenAddress, int port);
+
+        Client(const std::string &listenAddress);
 
         std::map<std::string, std::string> parameters;
         std::string record;
         std::string response;
         Header header{};
         int socket_;
-        struct sockaddr* address;
+        struct sockaddr *address;
         int addressLength;
+
         ~Client();
 
-        bool sendRequest(const std::string* stdinData);
-        std::string createRequest(const std::string* stdinData);
+        bool sendRequest(const std::string *stdinData);
+
+        std::string createRequest(const std::string *stdinData);
 
     private:
-        void buildRecord(const std::string* stdinData);
-        void buildPacket(int type, const std::string* content, int requestId);
+        void buildRecord(const std::string *stdinData);
 
-        static std::string buildNameValuePair(const std::string& name, const std::string& value);
+        void buildPacket(int type, const std::string *content, int requestId);
+
+        static std::string buildNameValuePair(const std::string &name, const std::string &value);
+
         static std::string encodeContentLength(size_t length);
+
         void readPacketHeader();
+
         void readPacket();
+
         bool connectToServer() const;
     };
-
 }
 
 #endif

@@ -39,5 +39,3 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         TBB::tbb
         /usr/lib/libphp.so)
 target_compile_definitions(${PROJECT_NAME} PRIVATE $<$<CONFIG:Debug>:DEBUG> CDS_THREADING_CXX11)
-
-#add_executable("t1" t/t1.cpp include/fastcgi.h src/fastcgi.cpp)

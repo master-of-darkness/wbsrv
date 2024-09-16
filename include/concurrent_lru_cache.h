@@ -15,14 +15,11 @@
  */
 
 #pragma once
+#define TBB_PREVIEW_CONCURRENT_LRU_CACHE 1
 
-#include <atomic>
-#include <mutex>
-#include <new>
-#include <thread>
-#include <vector>
+#include <tbb/concurrent_lru_cache.h>
 #include <tbb/concurrent_hash_map.h>
-
+#include <mutex>
 
 /**
  * ConcurrentLRUCache is a thread-safe hashtable with a limited size. When
@@ -48,7 +45,7 @@
  * ConcurrentScalableCache is recommended instead.
  */
 namespace utils {
-    template<class TKey, class TValue, class THash = tbb::tbb_hash_compare<TKey>>
+    template<class TKey, class TValue, class THash = tbb::tbb_hash_compare<TKey> >
     struct ConcurrentLRUCache {
     private:
         /**
@@ -61,10 +58,12 @@ namespace utils {
          */
         struct ListNode {
             ListNode()
-                    : m_prev(OutOfListMarker), m_next(nullptr) {}
+                : m_prev(OutOfListMarker), m_next(nullptr) {
+            }
 
             explicit ListNode(const TKey &key)
-                    : m_key(key), m_prev(OutOfListMarker), m_next(nullptr) {}
+                : m_key(key), m_prev(OutOfListMarker), m_next(nullptr) {
+            }
 
             TKey m_key;
             ListNode *m_prev;
@@ -83,10 +82,12 @@ namespace utils {
          */
         struct HashMapValue {
             HashMapValue()
-                    : m_listNode(nullptr) {}
+                : m_listNode(nullptr) {
+            }
 
             HashMapValue(const TValue &value, ListNode *node)
-                    : m_value(value), m_listNode(node) {}
+                : m_value(value), m_listNode(node) {
+            }
 
             TValue m_value;
             ListNode *m_listNode;
@@ -105,7 +106,8 @@ namespace utils {
          * details.
          */
         struct ConstAccessor {
-            ConstAccessor() {}
+            ConstAccessor() {
+            }
 
             const TValue &operator*() const {
                 return *get();
@@ -231,13 +233,13 @@ namespace utils {
 
     template<class TKey, class TValue, class THash>
     typename ConcurrentLRUCache<TKey, TValue, THash>::ListNode *const
-            ConcurrentLRUCache<TKey, TValue, THash>::OutOfListMarker = (ListNode * ) - 1;
+            ConcurrentLRUCache<TKey, TValue, THash>::OutOfListMarker = (ListNode *) -1;
 
     template<class TKey, class TValue, class THash>
     ConcurrentLRUCache<TKey, TValue, THash>::
     ConcurrentLRUCache(size_t maxSize)
-            : m_maxSize(maxSize), m_size(0),
-              m_map(std::thread::hardware_concurrency() * 4) // it will automatically grow
+        : m_maxSize(maxSize), m_size(0),
+          m_map(std::thread::hardware_concurrency() * 4) // it will automatically grow
     {
         m_head.m_prev = nullptr;
         m_head.m_next = &m_tail;

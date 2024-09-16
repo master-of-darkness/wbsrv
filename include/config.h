@@ -1,11 +1,8 @@
 #pragma once
 
-#include <string>
-#include <utility>
-#include <vector>
+#include <yaml-cpp/yaml.h>
 
 namespace config {
-
     class general {
     public:
         explicit general(std::string path) {
@@ -15,6 +12,7 @@ namespace config {
         bool load();
 
         int threads = 0;
+
     private:
         std::string path_;
     };
@@ -41,6 +39,7 @@ namespace config {
         bool ssl = false;
 
         int port = 80;
+
     private:
         std::string path_;
     };

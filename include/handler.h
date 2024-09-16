@@ -3,11 +3,7 @@
 #include <atomic>
 #include <utility>
 #include <folly/File.h>
-#include <folly/Memory.h>
 #include <proxygen/httpserver/RequestHandler.h>
-
-#include "utils.h"
-#include "php_sapi.h"
 
 namespace proxygen {
     class ResponseHandler;
@@ -15,9 +11,8 @@ namespace proxygen {
 
 class StaticHandler : public proxygen::RequestHandler {
 public:
-    explicit StaticHandler(std::string hostname, EmbedPHP &php_embed): hostname(std::move(hostname)),
-                                                                       php_embed_(php_embed) {
-    };
+    explicit StaticHandler(std::string hostname): hostname(std::move(hostname)) {
+    }
 
     void onRequest(
         std::unique_ptr<proxygen::HTTPMessage> headers) noexcept override;
@@ -41,7 +36,7 @@ private:
 
     void handleFileRead(const std::unique_ptr<proxygen::HTTPMessage> &headers);
 
-    void requestFastCgi(const std::string &h, int p, folly::EventBase* evb);
+    void requestFastCgi(const std::string &h, int p, folly::EventBase *evb);
 
     bool checkForCompletion();
 
@@ -57,5 +52,4 @@ private:
     std::atomic<bool> paused_{false};
     bool finished_{false};
     std::atomic<bool> error_{false};
-    EmbedPHP &php_embed_;
 };

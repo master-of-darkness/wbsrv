@@ -1,8 +1,4 @@
 #include "config.h"
-#include "defines.h"
-
-#include <yaml-cpp/yaml.h>
-
 using namespace config;
 
 bool general::load() {
@@ -24,10 +20,10 @@ bool vhost::load() {
         this->cert = config["certificate"].as<std::string>();
         this->private_key = config["private_key"].as<std::string>();
         this->password = config["password"].as<std::string>();
-        this->index_pages = config["index_page"].as<std::vector<std::string>>();
+        this->index_pages = config["index_page"].as<std::vector<std::string> >();
         this->cgi_ip = config["cgi_ip"].as<std::string>();
         this->cgi_port = config["cgi_port"].as<int>();
-        this->cgi_extensions = config["cgi_extensions"].as<std::vector<std::string>>();
+        this->cgi_extensions = config["cgi_extensions"].as<std::vector<std::string> >();
         return true;
     }
     return false;

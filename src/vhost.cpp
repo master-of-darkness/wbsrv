@@ -1,6 +1,5 @@
 #include <filesystem>
 
-#include "fastcgi.h"
 #include "vhost.h"
 #include "defines.h"
 #include "config.h"
@@ -13,7 +12,8 @@ bool vhost::load(std::vector<proxygen::HTTPServer::IPConfig> &config) {
         if (i.path().extension() == ".yaml") {
             config::vhost host(i.path().string());
             if (host.load()) {
-                proxygen::HTTPServer::IPConfig vhost(folly::SocketAddress(host.hostname, host.port, true), proxygen::HTTPServer::Protocol::HTTP);
+                proxygen::HTTPServer::IPConfig vhost(folly::SocketAddress(host.hostname, host.port, true),
+                                                     proxygen::HTTPServer::Protocol::HTTP);
 
                 if (host.ssl) {
                     wangle::SSLContextConfig cert;
@@ -24,23 +24,22 @@ bool vhost::load(std::vector<proxygen::HTTPServer::IPConfig> &config) {
                 }
 
                 if (!host.cgi_ip.empty() && host.cgi_port != -1 && !host.cgi_ip.empty()) {
-
                     list.insert(host.hostname + ':' + std::to_string(host.port),
-                        vinfo(
-                            host.web_dir,
-                            host.index_pages,
-                            true,
-                            host.cgi_extensions,
-                            host.cgi_ip,
-                            host.cgi_port
-                            ));
+                                vinfo(
+                                    host.web_dir,
+                                    host.index_pages,
+                                    true,
+                                    host.cgi_extensions,
+                                    host.cgi_ip,
+                                    host.cgi_port
+                                ));
                 } else {
                     list.insert(host.hostname + ':' + std::to_string(host.port),
-                        vinfo(
-                            host.web_dir,
-                            host.index_pages,
-                            false
-                            ));
+                                vinfo(
+                                    host.web_dir,
+                                    host.index_pages,
+                                    false
+                                ));
                 }
 
                 config.push_back(vhost);
