@@ -36,7 +36,7 @@ private:
 
     void handleFileRead(const std::unique_ptr<proxygen::HTTPMessage> &headers);
 
-    void requestFastCgi(const std::string &h, int p, folly::EventBase *evb);
+    void requestPHP(folly::EventBase *evb, const std::unique_ptr<proxygen::HTTPMessage> &headers);
 
     bool checkForCompletion();
 

@@ -54,8 +54,7 @@ void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
             if (vhost_accessor->fastcgi_enable) {
                 for (const std::string &cgi_ext: vhost_accessor->cgi_extensions) {
                     if (path_.ends_with(cgi_ext)) {
-                        requestFastCgi(vhost_accessor->cgi_host, vhost_accessor->cgi_port,
-                                       folly::EventBaseManager::get()->getEventBase());
+                        requestPHP(folly::EventBaseManager::get()->getEventBase(), headers);
                         return;
                     }
                 }
@@ -95,11 +94,10 @@ void StaticHandler::handleFileRead(const std::unique_ptr<HTTPMessage> &headers) 
     );
 }
 
-void StaticHandler::requestFastCgi(const std::string &h, int p, folly::EventBase *evb) {
-    evb->runInEventBaseThread([this] {
-        std::string a;
-        EmbedPHP::executeScript(path_, a);
-
+void StaticHandler::requestPHP(folly::EventBase *evb, const std::unique_ptr<HTTPMessage> &headers) {
+    std::string a;
+    EmbedPHP::executeScript(path_, a, headers);
+    evb->runInEventBaseThread([this, a] {
         ResponseBuilder(downstream_)
                 .status(STATUS_404)
                 .body(a)
