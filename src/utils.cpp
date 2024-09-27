@@ -32,6 +32,79 @@ constexpr std::pair<const char *, const char *> contentTypes[] = {
     {".pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"},
 };
 
+constexpr std::pair<int, const char *> errorPages[] = {
+    {
+        400,
+        "<html>"
+        "<head><title>400 Bad Request</title></head>"
+        "<body>"
+        "<center><h1>400 Bad Request</h1></center>"
+        "<hr><center>WBSRV</center>"
+        "</body></html>"
+    },
+
+    {
+        403,
+        "<html>"
+        "<head><title>403 Forbidden</title></head>"
+        "<body>"
+        "<center><h1>403 Forbidden</h1></center>"
+        "<hr><center>WBSRV</center>"
+        "</body></html>"
+    },
+
+    {
+        404,
+        "<html>"
+        "<head><title>404 Not Found</title></head>"
+        "<body>"
+        "<center><h1>404 Not Found</h1></center>"
+        "<hr><center>WBSRV</center>"
+        "</body></html>"
+    },
+
+    {
+        500,
+        "<html>"
+        "<head><title>500 Internal Server Error</title></head>"
+        "<body>"
+        "<center><h1>500 Internal Server Error</h1></center>"
+        "<hr><center>WBSRV</center>"
+        "</body></html>"
+    },
+
+    {
+        502,
+        "<html>"
+        "<head><title>502 Bad Gateway</title></head>"
+        "<body>"
+        "<center><h1>502 Bad Gateway</h1></center>"
+        "<hr><center>WBSRV</center>"
+        "</body></html>"
+    },
+
+    {
+        503,
+        "<html>"
+        "<head><title>503 Service Unavailable</title></head>"
+        "<body>"
+        "<center><h1>503 Service Unavailable</h1></center>"
+        "<hr><center>WBSRV</center>"
+        "</body></html>"
+    },
+
+    {
+        504,
+        "<html>"
+        "<head><title>504 Gateway Timeout</title></head>"
+        "<body>"
+        "<center><h1>504 Gateway Timeout</h1></center>"
+        "<hr><center>WBSRV</center>"
+        "</body></html>"
+    }
+};
+
+
 namespace utils {
     const char *getContentType(const std::string &path) {
         for (const auto &extension: contentTypes) {
@@ -40,5 +113,11 @@ namespace utils {
             }
         }
         return "application/octet-stream";
+    }
+
+    const char *getErrorPage(const int &error) {
+        for (const auto &errorPage: errorPages)
+            if (errorPage.first == error)
+                return errorPage.second;
     }
 } // namespace utils

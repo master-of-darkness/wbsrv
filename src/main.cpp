@@ -1,6 +1,10 @@
+#include <memory>
+#include <string>
+
 #include <folly/init/Init.h>
 #include <folly/executors/CPUThreadPoolExecutor.h>
 #include <folly/executors/GlobalExecutor.h>
+#include <proxygen/httpserver/HTTPServer.h>
 #include <syslog.h>
 
 #include "handler.h"
@@ -9,8 +13,6 @@
 #include "vhost.h"
 
 using namespace proxygen;
-
-using folly::SocketAddress;
 
 class StaticHandlerFactory : public RequestHandlerFactory {
 public:
@@ -21,7 +23,7 @@ public:
     }
 
     RequestHandler *onRequest(RequestHandler *, HTTPMessage *b) noexcept override {
-        return new StaticHandler(b->getHeaders().getSingleOrEmpty(HTTP_HEADER_HOST));
+        return new Handler(b->getHeaders().getSingleOrEmpty(HTTP_HEADER_HOST));
     }
 };
 

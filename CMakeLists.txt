@@ -22,15 +22,36 @@ find_package(TBB REQUIRED)
 file(GLOB_RECURSE SRC "${CMAKE_SOURCE_DIR}/src/*.cpp")
 
 add_executable(${PROJECT_NAME} ${SRC})
+
+
+execute_process(
+        COMMAND php-config --includes
+        OUTPUT_VARIABLE PHP_INCLUDES
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+# Split the result from php-config into an array
+separate_arguments(PHP_INCLUDE_DIRS UNIX_COMMAND "${PHP_INCLUDES}")
+# Remove the `-I` from each include path
+set(PROCESSED_INCLUDE_DIRS "")
+foreach(INCLUDE_DIR ${PHP_INCLUDE_DIRS})
+    string(REGEX REPLACE "^-I" "" CLEANED_INCLUDE_DIR ${INCLUDE_DIR})  # Remove the -I
+    list(APPEND PROCESSED_INCLUDE_DIRS ${CLEANED_INCLUDE_DIR})  # Add to new list
+endforeach()
+
+find_library(PHP_EMBED_LIB
+        NAMES libphp.so
+        HINTS
+        /usr/lib
+        /usr/local/lib
+        /usr/lib64
+        /usr/local/lib64
+        /opt/php/lib
+)
+message("PHP Library: ${PHP_EMBED_LIB}")
 target_include_directories(${PROJECT_NAME} PRIVATE
         ${CMAKE_SOURCE_DIR}/include
-        "/usr/include/php/20230831/sapi"
-        "/usr/include/php/20230831/ext"
-        "/usr/include/php/20230831/main"
-        "/usr/include/php/20230831/TSRM"
-        "/usr/include/php/20230831/Zend"
-        "/usr/include/php/20230831"
-
+        ${PROCESSED_INCLUDE_DIRS}
 )
 
 
@@ -39,5 +60,5 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         proxygen::proxygenhttpserver
         yaml-cpp::yaml-cpp
         TBB::tbb
-        /usr/lib/libphp.so)
+        ${PHP_EMBED_LIB})
 target_compile_definitions(${PROJECT_NAME} PRIVATE $<$<CONFIG:Debug>:DEBUG> CDS_THREADING_CXX11)

@@ -9,9 +9,9 @@ namespace proxygen {
     class ResponseHandler;
 }
 
-class StaticHandler : public proxygen::RequestHandler {
+class Handler : public proxygen::RequestHandler {
 public:
-    explicit StaticHandler(std::string hostname): hostname(std::move(hostname)) {
+    explicit Handler(std::string hostname): hostname(std::move(hostname)) {
     }
 
     void onRequest(

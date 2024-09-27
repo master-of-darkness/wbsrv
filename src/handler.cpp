@@ -22,7 +22,7 @@ using CacheAccessor = utils::ConcurrentLRUCache<std::string, std::shared_ptr<Cac
 
 utils::ConcurrentLRUCache<std::string, std::shared_ptr<CacheRow> > cache(256);
 
-void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
+void Handler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
     error_ = false;
     std::string requested_path = headers->getPath();
     vhost::const_accessor vhost_accessor;
@@ -65,19 +65,18 @@ void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
     } else {
         ResponseBuilder(downstream_)
                 .status(STATUS_400)
-                .body("Bad request")
+                .body(utils::getErrorPage(400))
                 .sendWithEOM();
     }
 }
 
-void StaticHandler::handleFileRead(const std::unique_ptr<HTTPMessage> &headers) {
+void Handler::handleFileRead(const std::unique_ptr<HTTPMessage> &headers) {
     try {
         file_ = std::make_unique<folly::File>(path_);
     } catch (const std::system_error &ex) {
         ResponseBuilder(downstream_)
                 .status(STATUS_404)
-                .body(folly::to<std::string>("Could not find ", headers->getPathAsStringPiece(), " ex=",
-                                             folly::exceptionStr(ex)))
+                .body(utils::getErrorPage(404))
                 .sendWithEOM();
         return;
     }
@@ -88,25 +87,25 @@ void StaticHandler::handleFileRead(const std::unique_ptr<HTTPMessage> &headers) 
     // Use a CPU executor since read(2) of a file can block
     readFileScheduled_ = true;
     folly::getUnsafeMutableGlobalCPUExecutor()->add(
-        std::bind(&StaticHandler::readFile,
+        std::bind(&Handler::readFile,
                   this,
                   folly::EventBaseManager::get()->getEventBase())
     );
 }
 
-void StaticHandler::requestPHP(folly::EventBase *evb, const std::unique_ptr<HTTPMessage> &headers) {
+void Handler::requestPHP(folly::EventBase *evb, const std::unique_ptr<HTTPMessage> &headers) {
     std::string a;
     EmbedPHP::executeScript(path_, a, headers);
     evb->runInEventBaseThread([this, a] {
         ResponseBuilder(downstream_)
-                .status(STATUS_404)
+                .status(STATUS_200)
                 .body(a)
                 .sendWithEOM();
     });
 }
 
 
-void StaticHandler::readFile(folly::EventBase *evb) {
+void Handler::readFile(folly::EventBase *evb) {
     folly::IOBufQueue buf(folly::IOBufQueue::cacheChainLength());
 
     while (file_ && !paused_) {
@@ -151,48 +150,48 @@ void StaticHandler::readFile(folly::EventBase *evb) {
     });
 }
 
-void StaticHandler::onEgressPaused() noexcept {
+void Handler::onEgressPaused() noexcept {
     // This will terminate readFile soon
     paused_ = true;
 }
 
-void StaticHandler::onEgressResumed() noexcept {
+void Handler::onEgressResumed() noexcept {
     paused_ = false;
     // If readFileScheduled_, it will reschedule itself
     if (!readFileScheduled_ && file_) {
         readFileScheduled_ = true;
         folly::getUnsafeMutableGlobalCPUExecutor()->add(
-            std::bind(&StaticHandler::readFile,
+            std::bind(&Handler::readFile,
                       this,
                       folly::EventBaseManager::get()->getEventBase()));
     }
 }
 
-void StaticHandler::onBody(std::unique_ptr<folly::IOBuf> /*body*/) noexcept {
+void Handler::onBody(std::unique_ptr<folly::IOBuf> /*body*/) noexcept {
     // ignore, only support GET
 }
 
-void StaticHandler::onEOM() noexcept {
+void Handler::onEOM() noexcept {
 }
 
-void StaticHandler::onUpgrade(UpgradeProtocol /*protocol*/) noexcept {
+void Handler::onUpgrade(UpgradeProtocol /*protocol*/) noexcept {
     // handler doesn't support upgrades
 }
 
-void StaticHandler::requestComplete() noexcept {
+void Handler::requestComplete() noexcept {
     finished_ = true;
     paused_ = true;
     checkForCompletion();
 }
 
-void StaticHandler::onError(ProxygenError /*err*/) noexcept {
+void Handler::onError(ProxygenError /*err*/) noexcept {
     error_ = true;
     finished_ = true;
     paused_ = true;
     checkForCompletion();
 }
 
-bool StaticHandler::checkForCompletion() {
+bool Handler::checkForCompletion() {
     if (finished_ && !readFileScheduled_) {
         delete this;
         return true;
