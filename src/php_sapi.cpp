@@ -18,7 +18,9 @@ static size_t embed_ub_write(const char *str, size_t str_length) {
 static void embed_php_register_variables(zval *track_vars_array) {
     php_import_environment_variables(track_vars_array);
     php_register_variable("SCRIPT_FILENAME", embed_file_name.c_str(), track_vars_array);
+    php_register_variable("PHP_SELF", g_http_message.getPath().c_str(), track_vars_array);
 
+    // fixme: remove this hardcode and make smth better
     g_http_message.getHeaders().forEach([&](const std::string &header, const std::string &val) {
         std::string v1 = header;
         std::ranges::replace(v1, '-', '_');
@@ -56,17 +58,22 @@ void EmbedPHP::executeScript(const std::string &path, std::string &retval,
 
     zend_file_handle file_handle;
 
-    zend_first_try
+    zend_try
         {
             zend_stream_init_filename(&file_handle, path.c_str());
             CG(skip_shebang) = true;
             php_execute_script(&file_handle);
-        } zend_catch {
+
         }
     zend_end_try();
-    zend_destroy_file_handle(&file_handle);
 
-    retval = std::move(sapi_return);
+    zend_destroy_file_handle(&file_handle);
+    if(PG(last_error_type) & E_FATAL_ERRORS)
+        retval = ZSTR_VAL(PG(last_error_message)); // Return error message as php response
+    else
+        retval = std::move(sapi_return);
+
+    // Close php embed and unlock mutex for next request
     php_embed_shutdown();
     m.unlock();
 }
