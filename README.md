@@ -63,8 +63,7 @@ index_page: ['index.html'] # default filename if no exact file specified in requ
 - [oneTBB](https://github.com/oneapi-src/oneTBB)
 
 In near future:
-- php embed module setting
 - create php core configuration directives
 - file upload support
-- TSRMC php support
-- custom .so php support
+- cookies
+- custom .so php support with dlopen

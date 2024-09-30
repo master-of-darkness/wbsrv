@@ -39,6 +39,10 @@ foreach(INCLUDE_DIR ${PHP_INCLUDE_DIRS})
     list(APPEND PROCESSED_INCLUDE_DIRS ${CLEANED_INCLUDE_DIR})  # Add to new list
 endforeach()
 
+
+# custom php build test
+#set(PROCESSED_INCLUDE_DIRS "deps/php-src/" "deps/php-src/main" "deps/php-src/sapi" "deps/php-src/TSRM" "deps/php-src/Zend")
+
 find_library(PHP_EMBED_LIB
         NAMES libphp.so
         HINTS
@@ -48,6 +52,10 @@ find_library(PHP_EMBED_LIB
         /usr/local/lib64
         /opt/php/lib
 )
+
+# custom php build test
+#set(PHP_EMBED_LIB ${CMAKE_SOURCE_DIR}/deps/php-src/libs/libphp.so)
+
 message("PHP Library: ${PHP_EMBED_LIB}")
 target_include_directories(${PROJECT_NAME} PRIVATE
         ${CMAKE_SOURCE_DIR}/include

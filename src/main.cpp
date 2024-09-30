@@ -11,6 +11,7 @@
 #include "defines.h"
 #include "config.h"
 #include "vhost.h"
+#include "php_sapi.h"
 
 using namespace proxygen;
 
@@ -101,6 +102,8 @@ int main(int argc, char *argv[]) {
             RequestHandlerChain().addThen<StaticHandlerFactory>().build();
     options.h2cEnabled = true;
 
+    EmbedPHP::Initialize(general_config.threads);
+
     auto diskIOThreadPool = std::make_shared<folly::CPUThreadPoolExecutor>(
         general_config.threads,
         std::make_shared<folly::NamedThreadFactory>("StaticDiskIOThread"));
@@ -122,6 +125,8 @@ int main(int argc, char *argv[]) {
     // Terminate the child process when the daemon completes
     exit(EXIT_SUCCESS);
 #endif
+
+    EmbedPHP::Shutdown();
 
     return 0;
 }
