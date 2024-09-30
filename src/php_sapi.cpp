@@ -13,9 +13,8 @@ using folly::SocketAddress;
     std::string sapi_return;
     std::string embed_file_name;
     HTTPMessage thread_http_message;
+    std::mutex m;  // Mutex to control thread access in non-ZTS environments.
 #endif
-
-std::mutex m;  // Mutex to control thread access in non-ZTS environments.
 
 static size_t embed_ub_write(const char *str, size_t str_length) {
     sapi_return += str;
