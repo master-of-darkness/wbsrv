@@ -2,10 +2,13 @@
 
 #include <yaml-cpp/yaml.h>
 
-namespace config {
-    class general {
+namespace config
+{
+    class general
+    {
     public:
-        explicit general(std::string path) {
+        explicit general(std::string path)
+        {
             path_ = std::move(path);
         }
 
@@ -17,9 +20,11 @@ namespace config {
         std::string path_;
     };
 
-    class vhost {
+    class vhost
+    {
     public:
-        explicit vhost(std::string path) {
+        explicit vhost(std::string path)
+        {
             path_ = std::move(path);
         }
 
@@ -31,9 +36,6 @@ namespace config {
         std::string hostname;
         std::string web_dir;
         std::vector<std::string> index_pages;
-        std::vector<std::string> cgi_extensions;
-        std::string cgi_ip;
-        int cgi_port = -1;
 
 
         bool ssl = false;

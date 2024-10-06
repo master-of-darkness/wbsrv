@@ -1,15 +1,19 @@
 cmake_minimum_required(VERSION 3.28)
 project(wbsrv)
 
+# Compiler settings
 set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_C_COMPILER "/usr/bin/clang")
+# todo: use whereis to get exact path
 set(CMAKE_CXX_COMPILER "/usr/bin/clang++")
+set(CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS "/usr/bin/clang-scan-deps-18")
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -fpermissive")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+
+# VCPKG settings
 set(VCPKG_TARGET_ARCHITECTURE x64)
 set(VCPKG_LIBRARY_LINKAGE static)
-set(FINDPHP_DEBUG ON)
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/")
 
 option(TBB_TEST OFF)
@@ -32,7 +36,7 @@ execute_process(
 
 # Split the result from php-config into an array
 separate_arguments(PHP_INCLUDE_DIRS UNIX_COMMAND "${PHP_INCLUDES}")
-# Remove the `-I` from each include path
+# Remove the `-I` from each include paphpath
 set(PROCESSED_INCLUDE_DIRS "")
 foreach(INCLUDE_DIR ${PHP_INCLUDE_DIRS})
     string(REGEX REPLACE "^-I" "" CLEANED_INCLUDE_DIR ${INCLUDE_DIR})  # Remove the -I

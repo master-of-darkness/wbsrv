@@ -34,7 +34,7 @@ public:
 private:
     void readFile(folly::EventBase *evb);
 
-    void handleFileRead(const std::unique_ptr<proxygen::HTTPMessage> &headers);
+    void handleFileRead();
 
     void requestPHP(folly::EventBase *evb, const std::unique_ptr<proxygen::HTTPMessage> &headers);
 
