@@ -62,7 +62,15 @@ constexpr std::pair<int, const char*> errorPages[] = {
         "<hr><center>WBSRV</center>"
         "</body></html>"
     },
-
+    {
+        405,
+        "<html>"
+        "<head><title>405 Method Not Allowed</title></head>"
+        "<body>"
+        "<center><h1>405 Method Not Allowed</h1></center>"
+        "<hr><center>WBSRV</center>"
+        "</body></html>"
+    },
     {
         500,
         "<html>"

@@ -31,8 +31,8 @@ bool vhost::load(std::vector<proxygen::HTTPServer::IPConfig>& config)
 
                 list.insert(host.hostname + ':' + std::to_string(host.port),
                             vinfo(
-                                host.web_dir,
-                                host.index_pages
+                                host.www_dir,
+                                host.index_page
                             ));
 
 

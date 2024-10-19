@@ -34,8 +34,8 @@ namespace config
         std::string cert;
         std::string password;
         std::string hostname;
-        std::string web_dir;
-        std::vector<std::string> index_pages;
+        std::string www_dir;
+        std::vector<std::string> index_page;
 
 
         bool ssl = false;

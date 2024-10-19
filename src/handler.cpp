@@ -3,7 +3,6 @@
 
 #include "defines.h"
 #include "utils.h"
-#include "vhost.h"
 #include "handler.h"
 #include "php_sapi.h"
 
@@ -26,56 +25,17 @@ utils::ConcurrentLRUCache<std::string, std::shared_ptr<CacheRow>> cache(256);
 
 void Handler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept
 {
-    error_ = false;
-    std::string requested_path = headers->getPath();
-    vhost::const_accessor vhost_accessor;
-    if (auto v = vhost::list.find(vhost_accessor, hostname); v)
-    {
-        CacheAccessor cache_acc;
-        // Construct the full path using the web directory and requested path
-        path_ = vhost_accessor->web_dir + '/' + requested_path;
-
-        // If the requested path is a directory, attempt to find a default page
-        if (std::filesystem::is_directory(path_))
-        {
-            for (const auto& index_page : vhost_accessor->index_pages)
-            {
-                std::string index_path = path_ + '/' + index_page;
-                if (std::filesystem::exists(index_path))
-                {
-                    path_ = index_path; // Use the found index page
-                    break;
-                }
-            }
-        }
-
-        // Check if the path is already cached
-        if (cache.find(cache_acc, path_))
-        {
-            const auto& cache_row = *cache_acc;
-            ResponseBuilder(downstream_)
-                .status(STATUS_200)
-                .header("Content-Type", cache_row->content_type)
-                .body(cache_row->text)
-                .sendWithEOM();
-        }
-        else
-        {
-            if (path_.ends_with(".php"))
-            {
-                requestPHP(folly::EventBaseManager::get()->getEventBase(), headers);
-                return;
-            }
-            handleFileRead();
-        }
-    }
-    else
-    {
+    if (!vhost::list.find(vhost_accessor, hostname))
         ResponseBuilder(downstream_)
             .status(STATUS_400)
             .body(utils::getErrorPage(400))
             .sendWithEOM();
-    }
+
+    error_ = false;
+    headers_ = std::move(headers);
+
+    // Construct the full path using the web directory and requested path
+    path_ = vhost_accessor->web_dir + headers_->getPath();
 }
 
 void Handler::handleFileRead()
@@ -105,19 +65,63 @@ void Handler::handleFileRead()
     );
 }
 
-void Handler::requestPHP(folly::EventBase* evb, const std::unique_ptr<HTTPMessage>& headers)
+void Handler::requestPHP(folly::EventBase* evb, bool checkBody)
 {
-    std::string a;
-    EmbedPHP::executeScript(path_, a, headers);
-    evb->runInEventBaseThread([this, a]
+    evb->runInEventBaseThread([this, checkBody]
     {
-        ResponseBuilder(downstream_)
-            .status(STATUS_200)
-            .body(a)
-            .sendWithEOM();
+        if (checkBody)
+            EmbedPHP::executeScript(path_, headers_, &messageBody, downstream_);
+        else
+            EmbedPHP::executeScript(path_, headers_, nullptr, downstream_);
     });
 }
 
+void Handler::handleGetRequest()
+{
+    CacheAccessor cache_acc;
+
+    // If the requested path is a directory, attempt to find a default page
+    if (std::filesystem::is_directory(path_))
+    {
+        for (const auto& index_page : vhost_accessor->index_pages)
+        {
+            std::string index_path = path_ + '/' + index_page;
+            if (std::filesystem::exists(index_path))
+            {
+                path_ = index_path; // Use the found index page
+                break;
+            }
+        }
+    }
+
+    // Check if the path is already cached
+    if (cache.find(cache_acc, path_))
+    {
+        const auto& cache_row = *cache_acc;
+        ResponseBuilder(downstream_)
+            .status(STATUS_200)
+            .header("Content-Type", cache_row->content_type)
+            .body(cache_row->text)
+            .sendWithEOM();
+    }
+    else
+    {
+        if (path_.ends_with(".php"))
+        {
+            requestPHP(folly::EventBaseManager::get()->getEventBase());
+            return;
+        }
+        handleFileRead();
+    }
+}
+
+void Handler::handlePostRequest()
+{
+    if (!headers_->getPathAsStringPiece().ends_with(".php"))
+        ResponseBuilder(downstream_).status(STATUS_405).body(utils::getErrorPage(405)).sendWithEOM();
+
+    requestPHP(folly::EventBaseManager::get()->getEventBase(), true);
+}
 
 void Handler::readFile(folly::EventBase* evb)
 {
@@ -198,13 +202,17 @@ void Handler::onEgressResumed() noexcept
     }
 }
 
-void Handler::onBody(std::unique_ptr<folly::IOBuf> /*body*/) noexcept
+void Handler::onBody(std::unique_ptr<folly::IOBuf> body) noexcept
 {
-    // ignore, only support GET
+    messageBody.append(body->toString());
 }
 
 void Handler::onEOM() noexcept
 {
+    if (headers_->getMethod() == HTTPMethod::GET)
+        handleGetRequest();
+    else if (headers_->getMethod() == HTTPMethod::POST)
+        handlePostRequest();
 }
 
 void Handler::onUpgrade(UpgradeProtocol /*protocol*/) noexcept

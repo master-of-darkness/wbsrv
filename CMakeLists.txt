@@ -45,7 +45,7 @@ endforeach()
 
 
 # custom php build test
-#set(PROCESSED_INCLUDE_DIRS "deps/php-src/" "deps/php-src/main" "deps/php-src/sapi" "deps/php-src/TSRM" "deps/php-src/Zend")
+set(PROCESSED_INCLUDE_DIRS "deps/php-src/" "deps/php-src/main" "deps/php-src/sapi" "deps/php-src/TSRM" "deps/php-src/Zend")
 
 find_library(PHP_EMBED_LIB
         NAMES libphp.so
@@ -58,7 +58,7 @@ find_library(PHP_EMBED_LIB
 )
 
 # custom php build test
-#set(PHP_EMBED_LIB ${CMAKE_SOURCE_DIR}/deps/php-src/libs/libphp.so)
+set(PHP_EMBED_LIB ${CMAKE_SOURCE_DIR}/deps/php-src/libs/libphp.so)
 
 message("PHP Library: ${PHP_EMBED_LIB}")
 target_include_directories(${PROJECT_NAME} PRIVATE
