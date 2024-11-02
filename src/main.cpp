@@ -134,13 +134,12 @@ int main(int argc, char* argv[])
 
     t.join();
 
+    EmbedPHP::Shutdown();
 #ifndef DEBUG
     syslog(LOG_NOTICE, "Stopping" DAEMON_NAME);
     closelog();
     exit(EXIT_SUCCESS);
 #endif
-
-    EmbedPHP::Shutdown();
 
     return 0;
 }
