@@ -1,13 +1,19 @@
 #include <memory>
 #include <string>
+#include <filesystem>
 
 #include <folly/init/Init.h>
 #include <folly/executors/CPUThreadPoolExecutor.h>
 #include <folly/executors/GlobalExecutor.h>
 #include <proxygen/httpserver/HTTPServer.h>
+#ifndef DEBUG
 #include <syslog.h>
+#endif
 
-#include "handler.h"
+#include "handler/static.h"
+#include "handler/sapi.h"
+#include "handler/error.h"
+
 #include "defines.h"
 #include "config.h"
 #include "vhost.h"
@@ -15,7 +21,9 @@
 
 using namespace proxygen;
 
-class StaticHandlerFactory : public RequestHandlerFactory
+utils::ConcurrentLRUCache<std::string, std::shared_ptr<CacheRow>> cache(256);
+
+class HandlerFactory : public RequestHandlerFactory
 {
 public:
     void onServerStart(folly::EventBase* /*evb*/) noexcept override
@@ -26,9 +34,30 @@ public:
     {
     }
 
-    RequestHandler* onRequest(RequestHandler*, HTTPMessage* b) noexcept override
+    RequestHandler* onRequest(RequestHandler*, HTTPMessage* message) noexcept override
     {
-        return new Handler(b->getHeaders().getSingleOrEmpty(HTTP_HEADER_HOST));
+        const std::string hostname = message->getHeaders().getSingleOrEmpty(HTTP_HEADER_HOST);
+        vhost::const_accessor vhostAccessor;
+        if (!vhost::list.find(vhostAccessor, hostname))
+            return new ErrorHandler(400);
+        auto path = vhostAccessor->web_dir + message->getPath();
+
+        if (std::filesystem::is_directory(path))
+        {
+            for (const auto& index_page : vhostAccessor->index_pages)
+            {
+                std::string index_path = path + index_page;
+                if (std::filesystem::exists(index_path))
+                {
+                    path = index_path; // Use the found index page
+                    break;
+                }
+            }
+        }
+
+        if (const size_t len = path.size(); path[len - 1] != 'p' && path[len - 2] != 'h' && path[len - 3] != 'p')
+            return new StaticHandler(path, &cache, &vhostAccessor);
+        return new EngineHandler(path, &cache);
     }
 };
 
@@ -41,10 +70,12 @@ int main(int argc, char* argv[])
     pid_t pid, sid;
 
     pid = fork();
-    if (pid > 0) {
+    if (pid > 0)
+    {
         exit(EXIT_SUCCESS);
     }
-    else if (pid < 0) {
+    else if (pid < 0)
+    {
         exit(EXIT_FAILURE);
     }
     umask(0);
@@ -53,12 +84,14 @@ int main(int argc, char* argv[])
     syslog(LOG_NOTICE, "Successfully started" DAEMON_NAME);
 
     sid = setsid();
-    if (sid < 0) {
+    if (sid < 0)
+    {
         syslog(LOG_ERR, "Could not generate session ID for child process");
         exit(EXIT_FAILURE);
     }
 
-    if ((chdir("/")) < 0) {
+    if ((chdir("/")) < 0)
+    {
         syslog(LOG_ERR, "Could not change working directory to /");
 
         exit(EXIT_FAILURE);
@@ -83,7 +116,7 @@ int main(int argc, char* argv[])
     options.shutdownOn = {SIGINT, SIGTERM, SIGSEGV};
     options.enableContentCompression = false;
     options.handlerFactories =
-        RequestHandlerChain().addThen<StaticHandlerFactory>().build();
+        RequestHandlerChain().addThen<HandlerFactory>().build();
     options.h2cEnabled = true;
 
     EmbedPHP::Initialize(general_config.threads);

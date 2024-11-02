@@ -181,13 +181,13 @@ void EmbedPHP::executeScript(const std::string& path, const std::unique_ptr<HTTP
     }
 
 
-    if(SG(request_info).request_uri)
+    if (SG(request_info).request_uri)
         free(SG(request_info).request_uri);
 
-    if(SG(request_info).path_translated)
+    if (SG(request_info).path_translated)
         free(SG(request_info).path_translated);
 
-    if(SG(request_info).query_string)
+    if (SG(request_info).query_string)
         free(SG(request_info).query_string);
 
     php_request_shutdown(nullptr);

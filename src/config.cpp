@@ -14,9 +14,10 @@ bool general::load()
             return true;
         }
         return false;
-    } catch (const YAML::BadFile&)
+    }
+    catch (const YAML::BadFile&)
     {
-        LOG(ERROR) <<"Can't open "<<this->path_ + "/server.yaml" <<". Ensure that file exists.";
+        LOG(ERROR) << "Can't open " << this->path_ + "/server.yaml" << ". Ensure that file exists.";
         return false;
     }
 }

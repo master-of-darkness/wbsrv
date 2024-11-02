@@ -44,9 +44,11 @@
  * TBB::CHM. So if that is a possibility for your workload,
  * ConcurrentScalableCache is recommended instead.
  */
-namespace utils {
-    template<class TKey, class TValue, class THash = tbb::tbb_hash_compare<TKey> >
-    struct ConcurrentLRUCache {
+namespace utils
+{
+    template <class TKey, class TValue, class THash = tbb::tbb_hash_compare<TKey>>
+    struct ConcurrentLRUCache
+    {
     private:
         /**
          * The LRU list node.
@@ -56,41 +58,48 @@ namespace utils {
          * on most operations, even find(), ruling out more efficient
          * implementations.
          */
-        struct ListNode {
+        struct ListNode
+        {
             ListNode()
-                : m_prev(OutOfListMarker), m_next(nullptr) {
+                : m_prev(OutOfListMarker), m_next(nullptr)
+            {
             }
 
-            explicit ListNode(const TKey &key)
-                : m_key(key), m_prev(OutOfListMarker), m_next(nullptr) {
+            explicit ListNode(const TKey& key)
+                : m_key(key), m_prev(OutOfListMarker), m_next(nullptr)
+            {
             }
 
             TKey m_key;
-            ListNode *m_prev;
-            ListNode *m_next;
+            ListNode* m_prev;
+            ListNode* m_next;
 
-            bool isInList() const {
+            bool isInList() const
+            {
                 return m_prev != OutOfListMarker;
             }
         };
 
-        static ListNode *const OutOfListMarker;
+        static ListNode* const OutOfListMarker;
 
         /**
          * The value that we store in the hashtable. The list node is allocated from
          * an internal object_pool. The ListNode* is owned by the list.
          */
-        struct HashMapValue {
+        struct HashMapValue
+        {
             HashMapValue()
-                : m_listNode(nullptr) {
+                : m_listNode(nullptr)
+            {
             }
 
-            HashMapValue(const TValue &value, ListNode *node)
-                : m_value(value), m_listNode(node) {
+            HashMapValue(const TValue& value, ListNode* node)
+                : m_value(value), m_listNode(node)
+            {
             }
 
             TValue m_value;
-            ListNode *m_listNode;
+            ListNode* m_listNode;
         };
 
         typedef tbb::concurrent_hash_map<TKey, HashMapValue, THash> HashMap;
@@ -105,23 +114,29 @@ namespace utils {
          * the user's value by dereferencing, thus hiding our implementation
          * details.
          */
-        struct ConstAccessor {
-            ConstAccessor() {
+        struct ConstAccessor
+        {
+            ConstAccessor()
+            {
             }
 
-            const TValue &operator*() const {
+            const TValue& operator*() const
+            {
                 return *get();
             }
 
-            const TValue *operator->() const {
+            const TValue* operator->() const
+            {
                 return get();
             }
 
-            const TValue *get() const {
+            const TValue* get() const
+            {
                 return &m_hashAccessor->second.m_value;
             }
 
-            bool empty() const {
+            bool empty() const
+            {
                 return m_hashAccessor.empty();
             }
 
@@ -135,11 +150,12 @@ namespace utils {
          */
         explicit ConcurrentLRUCache(size_t maxSize);
 
-        ConcurrentLRUCache(const ConcurrentLRUCache &other) = delete;
+        ConcurrentLRUCache(const ConcurrentLRUCache& other) = delete;
 
-        ConcurrentLRUCache &operator=(const ConcurrentLRUCache &) = delete;
+        ConcurrentLRUCache& operator=(const ConcurrentLRUCache&) = delete;
 
-        ~ConcurrentLRUCache() {
+        ~ConcurrentLRUCache()
+        {
             clear();
         }
 
@@ -149,7 +165,7 @@ namespace utils {
          * otherwise. Updates the eviction list, making the element the
          * most-recently used.
          */
-        bool find(ConstAccessor &ac, const TKey &key);
+        bool find(ConstAccessor& ac, const TKey& key);
 
         /**
          * Insert a value into the container. Both the key and value will be copied.
@@ -160,7 +176,7 @@ namespace utils {
          * will not be updated, and false will be returned. Otherwise, true will be
          * returned.
          */
-        bool insert(const TKey &key, const TValue &value);
+        bool insert(const TKey& key, const TValue& value);
 
         /**
          * Clear the container. NOT THREAD SAFE -- do not use while other threads
@@ -174,13 +190,14 @@ namespace utils {
          * completes. The keys will be inserted in order from most-recently used to
          * least-recently used.
          */
-        void snapshotKeys(std::vector<TKey> &keys);
+        void snapshotKeys(std::vector<TKey>& keys);
 
         /**
          * Get the approximate size of the container. May be slightly too low when
          * insertion is in progress.
          */
-        size_t size() const {
+        size_t size() const
+        {
             return m_size.load();
         }
 
@@ -189,13 +206,13 @@ namespace utils {
          * Unlink a node from the list. The caller must lock the list mutex while
          * this is called.
          */
-        void delink(ListNode *node);
+        void delink(ListNode* node);
 
         /**
          * Add a new node to the list in the most-recently used position. The caller
          * must lock the list mutex while this is called.
          */
-        void pushFront(ListNode *node);
+        void pushFront(ListNode* node);
 
         /**
          * Evict the least-recently used item from the container. This function does
@@ -231,11 +248,11 @@ namespace utils {
         ListMutex m_listMutex;
     };
 
-    template<class TKey, class TValue, class THash>
-    typename ConcurrentLRUCache<TKey, TValue, THash>::ListNode *const
-            ConcurrentLRUCache<TKey, TValue, THash>::OutOfListMarker = (ListNode *) -1;
+    template <class TKey, class TValue, class THash>
+    typename ConcurrentLRUCache<TKey, TValue, THash>::ListNode* const
+        ConcurrentLRUCache<TKey, TValue, THash>::OutOfListMarker = (ListNode*)-1;
 
-    template<class TKey, class TValue, class THash>
+    template <class TKey, class TValue, class THash>
     ConcurrentLRUCache<TKey, TValue, THash>::
     ConcurrentLRUCache(size_t maxSize)
         : m_maxSize(maxSize), m_size(0),
@@ -246,22 +263,26 @@ namespace utils {
         m_tail.m_prev = &m_head;
     }
 
-    template<class TKey, class TValue, class THash>
+    template <class TKey, class TValue, class THash>
     bool ConcurrentLRUCache<TKey, TValue, THash>::
-    find(ConstAccessor &ac, const TKey &key) {
-        HashMapConstAccessor &hashAccessor = ac.m_hashAccessor;
-        if (!m_map.find(hashAccessor, key)) {
+    find(ConstAccessor& ac, const TKey& key)
+    {
+        HashMapConstAccessor& hashAccessor = ac.m_hashAccessor;
+        if (!m_map.find(hashAccessor, key))
+        {
             return false;
         }
 
         // Acquire the lock, but don't block if it is already held
         std::unique_lock<ListMutex> lock(m_listMutex, std::try_to_lock);
-        if (lock) {
-            ListNode *node = hashAccessor->second.m_listNode;
+        if (lock)
+        {
+            ListNode* node = hashAccessor->second.m_listNode;
             // The list node may be out of the list if it is in the process of being
             // inserted or evicted. Doing this check allows us to lock the list for
             // shorter periods of time.
-            if (node->isInList()) {
+            if (node->isInList())
+            {
                 delink(node);
                 pushFront(node);
             }
@@ -270,14 +291,16 @@ namespace utils {
         return true;
     }
 
-    template<class TKey, class TValue, class THash>
+    template <class TKey, class TValue, class THash>
     bool ConcurrentLRUCache<TKey, TValue, THash>::
-    insert(const TKey &key, const TValue &value) {
+    insert(const TKey& key, const TValue& value)
+    {
         // Insert into the CHM
-        ListNode *node = new ListNode(key);
+        ListNode* node = new ListNode(key);
         HashMapAccessor hashAccessor;
         HashMapValuePair hashMapValue(key, HashMapValue(value, node));
-        if (!m_map.insert(hashAccessor, hashMapValue)) {
+        if (!m_map.insert(hashAccessor, hashMapValue))
+        {
             delete node;
             return false;
         }
@@ -285,7 +308,8 @@ namespace utils {
         // Evict if necessary, now that we know the hashmap insertion was successful.
         size_t size = m_size.load();
         bool evictionDone = false;
-        if (size >= m_maxSize) {
+        if (size >= m_maxSize)
+        {
             // The container is at (or over) capacity, so eviction needs to be done.
             // Do not decrement m_size, since that would cause other threads to
             // inappropriately omit eviction during their own inserts.
@@ -299,10 +323,12 @@ namespace utils {
         std::unique_lock<ListMutex> lock(m_listMutex);
         pushFront(node);
         lock.unlock();
-        if (!evictionDone) {
+        if (!evictionDone)
+        {
             size = m_size++;
         }
-        if (size > m_maxSize) {
+        if (size > m_maxSize)
+        {
             // It is possible for the size to temporarily exceed the maximum if there is
             // a heavy insert() load, once only as the cache fills. In this situation,
             // we have to be careful not to have every thread simultaneously attempt to
@@ -313,20 +339,23 @@ namespace utils {
             // We could continue to evict in a loop, but if there are a lot of threads
             // here at the same time, that could lead to spinning. So we will just evict
             // one extra element per insert() until the overfill is rectified.
-            if (m_size.compare_exchange_strong(size, size - 1)) {
+            if (m_size.compare_exchange_strong(size, size - 1))
+            {
                 evict();
             }
         }
         return true;
     }
 
-    template<class TKey, class TValue, class THash>
+    template <class TKey, class TValue, class THash>
     void ConcurrentLRUCache<TKey, TValue, THash>::
-    clear() {
+    clear()
+    {
         m_map.clear();
-        ListNode *node = m_head.m_next;
-        ListNode *next;
-        while (node != &m_tail) {
+        ListNode* node = m_head.m_next;
+        ListNode* next;
+        while (node != &m_tail)
+        {
             next = node->m_next;
             delete node;
             node = next;
@@ -336,42 +365,48 @@ namespace utils {
         m_size = 0;
     }
 
-    template<class TKey, class TValue, class THash>
+    template <class TKey, class TValue, class THash>
     void ConcurrentLRUCache<TKey, TValue, THash>::
-    snapshotKeys(std::vector<TKey> &keys) {
+    snapshotKeys(std::vector<TKey>& keys)
+    {
         keys.reserve(keys.size() + m_size.load());
         std::lock_guard<ListMutex> lock(m_listMutex);
-        for (ListNode *node = m_head.m_next; node != &m_tail; node = node->m_next) {
+        for (ListNode* node = m_head.m_next; node != &m_tail; node = node->m_next)
+        {
             keys.push_back(node->m_key);
         }
     }
 
-    template<class TKey, class TValue, class THash>
+    template <class TKey, class TValue, class THash>
     inline void ConcurrentLRUCache<TKey, TValue, THash>::
-    delink(ListNode *node) {
-        ListNode *prev = node->m_prev;
-        ListNode *next = node->m_next;
+    delink(ListNode* node)
+    {
+        ListNode* prev = node->m_prev;
+        ListNode* next = node->m_next;
         prev->m_next = next;
         next->m_prev = prev;
         node->m_prev = OutOfListMarker;
     }
 
-    template<class TKey, class TValue, class THash>
+    template <class TKey, class TValue, class THash>
     inline void ConcurrentLRUCache<TKey, TValue, THash>::
-    pushFront(ListNode *node) {
-        ListNode *oldRealHead = m_head.m_next;
+    pushFront(ListNode* node)
+    {
+        ListNode* oldRealHead = m_head.m_next;
         node->m_prev = &m_head;
         node->m_next = oldRealHead;
         oldRealHead->m_prev = node;
         m_head.m_next = node;
     }
 
-    template<class TKey, class TValue, class THash>
+    template <class TKey, class TValue, class THash>
     void ConcurrentLRUCache<TKey, TValue, THash>::
-    evict() {
+    evict()
+    {
         std::unique_lock<ListMutex> lock(m_listMutex);
-        ListNode *moribund = m_tail.m_prev;
-        if (moribund == &m_head) {
+        ListNode* moribund = m_tail.m_prev;
+        if (moribund == &m_head)
+        {
             // List is empty, can't evict
             return;
         }
@@ -379,7 +414,8 @@ namespace utils {
         lock.unlock();
 
         HashMapAccessor hashAccessor;
-        if (!m_map.find(hashAccessor, moribund->m_key)) {
+        if (!m_map.find(hashAccessor, moribund->m_key))
+        {
             // Presumably unreachable
             return;
         }

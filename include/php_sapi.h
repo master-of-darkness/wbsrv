@@ -15,9 +15,11 @@ extern "C" {
 #include <sapi/embed/php_embed.h>
 }
 
-namespace EmbedPHP {
+namespace EmbedPHP
+{
     void Initialize(int threads_expected);
-    void executeScript(const std::string &path,
-                       const std::unique_ptr<proxygen::HTTPMessage> &headers, std::string *message_body = nullptr, proxygen::ResponseHandler* downstream_ = nullptr);
+    void executeScript(const std::string& path,
+                       const std::unique_ptr<proxygen::HTTPMessage>& headers, std::string* message_body = nullptr,
+                       proxygen::ResponseHandler* downstream_ = nullptr);
     void Shutdown();
 }

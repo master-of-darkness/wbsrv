@@ -4,12 +4,15 @@
 #include <string>
 #include <map>
 
-namespace fastcgi {
-    inline unsigned int toUnsignedByte(int value) {
+namespace fastcgi
+{
+    inline unsigned int toUnsignedByte(int value)
+    {
         return static_cast<unsigned int>(value) & 0xff;
     }
 
-    struct Header {
+    struct Header
+    {
         unsigned int version;
         unsigned int type;
         unsigned int requestId;
@@ -52,32 +55,33 @@ namespace fastcgi {
     constexpr int READ_BUFFER_LENGTH = 1024;
     constexpr int MAX_CONTENT_LENGTH = 0xffff;
 
-    class Client {
+    class Client
+    {
     public:
-        Client(const std::string &listenAddress, int port);
+        Client(const std::string& listenAddress, int port);
 
-        Client(const std::string &listenAddress);
+        Client(const std::string& listenAddress);
 
         std::map<std::string, std::string> parameters;
         std::string record;
         std::string response;
         Header header{};
         int socket_;
-        struct sockaddr *address;
+        struct sockaddr* address;
         int addressLength;
 
         ~Client();
 
-        bool sendRequest(const std::string *stdinData);
+        bool sendRequest(const std::string* stdinData);
 
-        std::string createRequest(const std::string *stdinData);
+        std::string createRequest(const std::string* stdinData);
 
     private:
-        void buildRecord(const std::string *stdinData);
+        void buildRecord(const std::string* stdinData);
 
-        void buildPacket(int type, const std::string *content, int requestId);
+        void buildPacket(int type, const std::string* content, int requestId);
 
-        static std::string buildNameValuePair(const std::string &name, const std::string &value);
+        static std::string buildNameValuePair(const std::string& name, const std::string& value);
 
         static std::string encodeContentLength(size_t length);
 
