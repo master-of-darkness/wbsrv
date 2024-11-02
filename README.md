@@ -13,10 +13,10 @@
 
 Tested on **Dell XPS 13 9310** laptop with following hardware:
 - Processor: 11th Gen Intel i7-1185G7 (8) @ 4.800GHz
-- Operating System: Fedora Linux 40 (KDE Plasma) x86_64
-- Kernel: 6.9.7-200.fc40.x86_64
+- Operating System: Kubuntu 24.04.1 LTS
+- Kernel: 6.8.0-48-generic 
 - Memory: 15.3 GiB of RAM
-## ![Screenshot](https://i.imgur.com/p7X24U1.png)
+## ![Screenshot](https://i.imgur.com/XW1drkz.png)
                     
 ## Installation
 
