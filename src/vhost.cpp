@@ -35,8 +35,11 @@ bool vhost::load(std::vector<proxygen::HTTPServer::IPConfig>& config)
                                 host.index_page
                             ));
 
-
-                config.push_back(vhost);
+                if (std::ranges::find_if(config, [vhost](const proxygen::HTTPServer::IPConfig& item)
+                {
+                    return item.address == vhost.address;
+                }) == config.end())
+                    config.push_back(vhost);
             }
         }
     }
