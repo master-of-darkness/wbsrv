@@ -1,11 +1,10 @@
 cmake_minimum_required(VERSION 3.28)
-project(wbsrv)
 
 # Compiler settings
 set(CMAKE_CXX_STANDARD 23)
-# todo: use whereis to get exact path
+set(CMAKE_C_COMPILER  "/usr/bin/clang")
 set(CMAKE_CXX_COMPILER "/usr/bin/clang++")
-set(CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS "/usr/bin/clang-scan-deps-18")
+set(CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS "/usr/bin/clang-scan-deps-19")
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -fpermissive")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
@@ -13,6 +12,8 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 # VCPKG settings
 set(VCPKG_TARGET_ARCHITECTURE x64)
 set(VCPKG_LIBRARY_LINKAGE static)
+
+project(wbsrv)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/")
 

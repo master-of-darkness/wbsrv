@@ -1,0 +1,1 @@
+./configure     --enable-debug     --enable-cli     --enable-zts     --with-zlib     --with-curl     --with-openssl     --enable-mbstring     --with-libdir=/usr/lib/x86_64-linux-gnu     --with-jpeg     --with-png     --with-freetype     --enable-so --enable-embed=shared
