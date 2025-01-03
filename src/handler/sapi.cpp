@@ -48,10 +48,25 @@ void EngineHandler::onError(ProxygenError /*err*/) noexcept
 
 void EngineHandler::onEOM() noexcept
 {
-    if (!messageBody.empty())
-        EmbedPHP::executeScript(path_, headers_, &messageBody, downstream_);
+    CacheAccessor cache_acc;
+
+    if (!cache_->find(cache_acc, path_))
+    {
+        if (!messageBody.empty())
+            EmbedPHP::executeScript(path_, headers_, &messageBody, downstream_, cache_, web_root_);
+        else
+            EmbedPHP::executeScript(path_, headers_, nullptr, downstream_, cache_, web_root_);
+    }
     else
-        EmbedPHP::executeScript(path_, headers_, nullptr, downstream_);
+    {
+        const auto& cache_row = *cache_acc;
+        ResponseBuilder builder(downstream_);
+        builder.status(200, "OK");
+        for (const auto& header : cache_row->headers)
+            builder.header(header.first, header.second);
+
+        builder.body(cache_row->text).sendWithEOM();
+    }
 }
 
 void EngineHandler::onBody(std::unique_ptr<folly::IOBuf> body) noexcept

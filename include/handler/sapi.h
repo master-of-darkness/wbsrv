@@ -8,8 +8,8 @@
 class EngineHandler : public proxygen::RequestHandler
 {
 public:
-    explicit EngineHandler(std::string path, utils::ConcurrentLRUCache<std::string, std::shared_ptr<CacheRow>>* cache):
-        cache_(cache), path_(std::move(path))
+    explicit EngineHandler(std::string path, utils::ConcurrentLRUCache<std::string, std::shared_ptr<CacheRow>>* cache, std::string web_root):
+        cache_(cache), path_(std::move(path)), web_root_(web_root)
     {
     }
 
@@ -42,6 +42,8 @@ private:
     std::string _temp_text;
 
     const char* _temp_content_type;
+
+    std::string web_root_;
 
     std::string messageBody;
 

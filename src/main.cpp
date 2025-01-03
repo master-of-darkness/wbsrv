@@ -57,7 +57,7 @@ public:
 
         if (const size_t len = path.size(); path[len - 1] != 'p' && path[len - 2] != 'h' && path[len - 3] != 'p')
             return new StaticHandler(path, &cache, &vhostAccessor);
-        return new EngineHandler(path, &cache);
+        return new EngineHandler(path, &cache, vhostAccessor->web_dir);
     }
 };
 
@@ -143,3 +143,5 @@ int main(int argc, char* argv[])
 
     return 0;
 }
+
+

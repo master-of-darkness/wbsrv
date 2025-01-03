@@ -16,6 +16,7 @@ struct CacheRow
 
     std::string content_type;
     std::string text;
+    std::unordered_map<std::string, std::string> headers;
 };
 
 typedef utils::ConcurrentLRUCache<std::string, std::shared_ptr<CacheRow>>::ConstAccessor CacheAccessor;

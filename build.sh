@@ -15,7 +15,7 @@ cd "$PHP_SRC_DIR" || exit
 # Clean any previous builds
 echo "Cleaning previous builds..."
 make clean || true
-./buildconf --force
+./buildconf
 
 # Configure the build with the specified options
 echo "Configuring PHP build..."
@@ -32,7 +32,16 @@ echo "Configuring PHP build..."
     --with-png \
     --with-freetype \
     --enable-so \
-    --enable-embed=shared
+    --enable-embed=shared \
+    --with-mysqli \
+    --with-pdo-mysql \
+    --enable-opcache \
+    --enable-sockets \
+    --enable-gd \
+    --with-gd \
+    --with-xsl \
+    --with-xmlrpc \
+    --with-zlib-dir=/usr/include
 
 # Compile PHP
 echo "Building PHP..."
@@ -40,7 +49,7 @@ make -j$(nproc)
 
 # Notify the user of successful build
 if [ $? -eq 0 ]; then
-    echo "PHP has been successfully built."
+    echo "PHP with MySQL support has been successfully built."
 else
     echo "PHP build failed."
     exit 1
