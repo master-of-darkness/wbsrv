@@ -9,21 +9,10 @@
 - **Ease of Use:** Simple configuration and deployment process.
 - **Cache system**: Least Recently Used algorithm of caching allows to store pages in memory
 - **PHP**: Implemented with Embed SAPI 
-## Benchmarks results
-
-Tested on **Dell XPS 13 9310** laptop with following hardware:
-- Processor: 11th Gen Intel i7-1185G7 (8) @ 4.800GHz
-- Operating System: Kubuntu 24.04.1 LTS
-- Kernel: 6.8.0-48-generic 
-- Memory: 15.3 GiB of RAM
-## ![Screenshot](https://i.imgur.com/XW1drkz.png)
-                    
-## Installation
-
 ### Prerequisites
 
 - [CMake](https://cmake.org/)
-- A C++20 compatible compiler (e.g., GCC, Clang)
+- A C++20 compatible compiler (Clang)
 - Linux-based system
 - [Proxygen](https://github.com/facebook/proxygen) library and its dependencies
 #### To build
@@ -65,5 +54,4 @@ index_page: ['index.html'] # default filename if no exact file specified in requ
 In near future:
 - create php core configuration directives
 - file upload support
-- cookies
 - custom .so php support with dlopen
