@@ -4,7 +4,17 @@ cmake_minimum_required(VERSION 3.28)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_C_COMPILER  "/usr/bin/clang")
 set(CMAKE_CXX_COMPILER "/usr/bin/clang++")
-set(CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS "/usr/bin/clang-scan-deps")
+if(EXISTS "/usr/bin/clang-scan-deps")
+    set(CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS "/usr/bin/clang-scan-deps")
+elseif (EXISTS "/usr/bin/clang-scan-deps-18")
+    set(CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS "/usr/bin/clang-scan-deps-18")
+elseif (EXISTS "/usr/bin/clang-scan-deps-19")
+    set(CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS "/usr/bin/clang-scan-deps-19")
+else()
+    message(FATAL_ERROR "No clang-tools have been found. Please, run: sudo apt install clang-tools")
+endif ()
+
+
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -fpermissive")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
@@ -27,7 +37,6 @@ find_package(TBB REQUIRED)
 file(GLOB_RECURSE SRC "${CMAKE_SOURCE_DIR}/src/*.cpp")
 
 add_executable(${PROJECT_NAME} ${SRC})
-
 
 execute_process(
         COMMAND php-config --includes
