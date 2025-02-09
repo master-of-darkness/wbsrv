@@ -36,7 +36,9 @@ find_package(TBB REQUIRED)
 
 file(GLOB_RECURSE SRC "${CMAKE_SOURCE_DIR}/src/*.cpp")
 
-add_executable(${PROJECT_NAME} ${SRC})
+add_executable(${PROJECT_NAME} ${SRC}
+        include/plugin.h
+        include/plugin_manager.h)
 
 execute_process(
         COMMAND php-config --includes

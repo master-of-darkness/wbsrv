@@ -12,9 +12,6 @@ fi
 # Navigate to the PHP source directory
 cd "$PHP_SRC_DIR" || exit
 
-# Clean any previous builds
-echo "Cleaning previous builds..."
-make clean || true
 ./buildconf
 
 # Configure the build with the specified options
