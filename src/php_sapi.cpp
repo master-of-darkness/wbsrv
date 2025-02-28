@@ -152,6 +152,10 @@ void EmbedPHP::executeScript(const std::string& path, const std::unique_ptr<HTTP
     std::lock_guard<std::mutex> guard(m);
 #endif
 
+
+    // TODO: 1. Implement a proper caching of request based on requested url
+    // TODO: 2. Cache only GET responses and not POST
+    // TODO: 3. Fix memory leak of PHP execution
     thread_http_message = *http_message;
     thread_web_root = web_root;
     embed_file_name = path;
