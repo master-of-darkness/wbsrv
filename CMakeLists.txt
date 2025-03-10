@@ -27,12 +27,9 @@ project(wbsrv)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/")
 
-option(TBB_TEST OFF)
-
 find_package(proxygen CONFIG REQUIRED)
 find_package(yaml-cpp CONFIG REQUIRED)
 find_package(gflags REQUIRED)
-find_package(TBB REQUIRED)
 find_package(benchmark REQUIRED)
 
 file(GLOB_RECURSE SRC "${CMAKE_SOURCE_DIR}/src/*.cpp")
@@ -83,11 +80,10 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         proxygen::proxygen
         proxygen::proxygenhttpserver
         yaml-cpp::yaml-cpp
-        TBB::tbb
         ${PHP_EMBED_LIB})
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE $<$<CONFIG:Debug>:DEBUG>)
 
 # Link Google Benchmark
 add_executable(benchmark_concurrent_lru_cache tests/benchmark_concurrent_lru_cache.cpp include/concurrent_cache.h)
-target_link_libraries(benchmark_concurrent_lru_cache benchmark::benchmark TBB::tbb)
+target_link_libraries(benchmark_concurrent_lru_cache benchmark::benchmark)
