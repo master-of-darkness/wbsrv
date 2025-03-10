@@ -33,10 +33,12 @@ find_package(proxygen CONFIG REQUIRED)
 find_package(yaml-cpp CONFIG REQUIRED)
 find_package(gflags REQUIRED)
 find_package(TBB REQUIRED)
+find_package(benchmark REQUIRED)
 
 file(GLOB_RECURSE SRC "${CMAKE_SOURCE_DIR}/src/*.cpp")
 
-add_executable(${PROJECT_NAME} ${SRC})
+add_executable(${PROJECT_NAME} ${SRC}
+        include/concurrent_cache.h)
 
 execute_process(
         COMMAND php-config --includes
@@ -83,4 +85,9 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         yaml-cpp::yaml-cpp
         TBB::tbb
         ${PHP_EMBED_LIB})
-target_compile_definitions(${PROJECT_NAME} PRIVATE $<$<CONFIG:Debug>:DEBUG> CDS_THREADING_CXX11)
+
+target_compile_definitions(${PROJECT_NAME} PRIVATE $<$<CONFIG:Debug>:DEBUG>)
+
+# Link Google Benchmark
+add_executable(benchmark_concurrent_lru_cache tests/benchmark_concurrent_lru_cache.cpp include/concurrent_cache.h)
+target_link_libraries(benchmark_concurrent_lru_cache benchmark::benchmark TBB::tbb)

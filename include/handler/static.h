@@ -3,13 +3,10 @@
 #include "common.h"
 #include "vhost.h"
 
-class StaticHandler : public proxygen::RequestHandler
-{
+class StaticHandler : public proxygen::RequestHandler {
 public:
-    explicit StaticHandler(std::string path, utils::ConcurrentLRUCache<std::string, std::shared_ptr<CacheRow>>* cache,
-                           vhost::const_accessor* vhost):
-        cache_(cache), path_(std::move(path)), vhost_accessor_(vhost)
-    {
+    explicit StaticHandler(std::string path):
+        path_(std::move(path)) {
     }
 
     void onRequest(
@@ -30,13 +27,9 @@ public:
     void onBody(std::unique_ptr<folly::IOBuf> body) noexcept override;
 
 private:
-    void readFile(folly::EventBase* evb);
+    void readFile(folly::EventBase *evb);
 
     bool checkForCompletion();
-
-    utils::ConcurrentLRUCache<std::string, std::shared_ptr<CacheRow>>* cache_ = nullptr;
-
-    vhost::const_accessor* vhost_accessor_ = nullptr;
 
     std::unique_ptr<proxygen::HTTPMessage> headers_;
 

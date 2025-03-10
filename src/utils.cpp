@@ -1,6 +1,8 @@
 #include "utils.h"
 
-constexpr std::pair<const char*, const char*> contentTypes[] = {
+utils::ConcurrentLRUCache<std::string, std::shared_ptr<CacheRow> > utils::cache(256);
+
+constexpr std::pair<const char *, const char *> contentTypes[] = {
     {".html", "text/html"},
     {".htm", "text/html"},
     {".txt", "text/plain"},
@@ -32,7 +34,7 @@ constexpr std::pair<const char*, const char*> contentTypes[] = {
     {".pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"},
 };
 
-constexpr std::pair<int, const char*> errorPages[] = {
+constexpr std::pair<int, const char *> errorPages[] = {
     {
         400,
         "<html>"
@@ -113,23 +115,18 @@ constexpr std::pair<int, const char*> errorPages[] = {
 };
 
 
-namespace utils
-{
-    const char* getContentType(const std::string& path)
-    {
-        for (const auto& extension : contentTypes)
-        {
-            if (path.ends_with(extension.first))
-            {
+namespace utils {
+    const char *getContentType(const std::string &path) {
+        for (const auto &extension: contentTypes) {
+            if (path.ends_with(extension.first)) {
                 return extension.second;
             }
         }
         return "application/octet-stream";
     }
 
-    const char* getErrorPage(const int& error)
-    {
-        for (const auto& errorPage : errorPages)
+    const char *getErrorPage(const int &error) {
+        for (const auto &errorPage: errorPages)
             if (errorPage.first == error)
                 return errorPage.second;
     }

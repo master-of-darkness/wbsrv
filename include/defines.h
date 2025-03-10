@@ -18,3 +18,6 @@
 #define DEFAULTPAGE_FILENAME "index.html"
 #define VERSION "0.1"
 #define NAME_N_VERSION "wbsrv 0.1"
+
+#define CACHE_TTL 300 // 5 minutes
+

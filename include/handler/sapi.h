@@ -5,12 +5,10 @@
 #include "common.h"
 #include "vhost.h"
 
-class EngineHandler : public proxygen::RequestHandler
-{
+class EngineHandler : public proxygen::RequestHandler {
 public:
-    explicit EngineHandler(std::string path, utils::ConcurrentLRUCache<std::string, std::shared_ptr<CacheRow>>* cache, std::string web_root):
-        cache_(cache), path_(std::move(path)), web_root_(web_root)
-    {
+    explicit EngineHandler(std::string path,
+                           std::string web_root): path_(std::move(path)), web_root_(web_root) {
     }
 
     void onRequest(
@@ -33,15 +31,13 @@ public:
 private:
     bool checkForCompletion();
 
-    utils::ConcurrentLRUCache<std::string, std::shared_ptr<CacheRow>>* cache_ = nullptr;
-
     std::unique_ptr<proxygen::HTTPMessage> headers_;
 
     std::string hostname;
 
     std::string _temp_text;
 
-    const char* _temp_content_type;
+    const char *_temp_content_type;
 
     std::string web_root_;
 
