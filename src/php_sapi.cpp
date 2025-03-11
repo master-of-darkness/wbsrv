@@ -142,8 +142,6 @@ void EmbedPHP::executeScript(const std::string &path, const std::unique_ptr<HTTP
 
 
     // TODO: 1. Implement a proper caching of request based on requested url
-    // TODO: 2. Cache only GET responses and not POST
-    // TODO: 3. Fix memory leak of PHP execution
     thread_http_message = *http_message;
     thread_web_root = std::move(web_root);
     embed_file_name = path;
@@ -182,22 +180,22 @@ void EmbedPHP::executeScript(const std::string &path, const std::unique_ptr<HTTP
     if (PG(last_error_type) & E_FATAL_ERRORS && PG(last_error_message)) {
         builder->status(STATUS_500).body(ZSTR_VAL(PG(last_error_message))).sendWithEOM();
     } else {
-        auto cache_acc = utils::cache.get(path);
-        if (!cache_acc.has_value()) {
-            builder->status(SG(sapi_headers).http_response_code, "Ok");
-            for (const auto &[fst, snd]: headers_to_send) {
-                if (!fst.empty())
-                    builder->header(fst, snd);
+        builder->status(SG(sapi_headers).http_response_code, "Ok");
+        CacheRow cache_row;
+        for (const auto &[fst, snd]: headers_to_send) {
+            if (!fst.empty()) {
+                builder->header(fst, snd);
+                if (fst == "Content-Type") {
+                    cache_row.content_type = snd;
+                }
             }
-            builder->body(sapi_return).sendWithEOM();
-            CacheRow cache_row;
-            cache_row.content_type = headers_to_send["Content-Type"];
-            cache_row.headers = headers_to_send;
-            cache_row.text = sapi_return;
-            cache_row.time_to_die = std::chrono::steady_clock::now() + std::chrono::seconds(CACHE_TTL);
-
-            utils::cache.put(path, std::make_shared<CacheRow>(cache_row));
         }
+        builder->body(sapi_return).sendWithEOM();
+        cache_row.headers = headers_to_send;
+        cache_row.text = sapi_return;
+        cache_row.time_to_die = std::chrono::steady_clock::now() + std::chrono::seconds(CACHE_TTL);
+
+        utils::cache.put(path, std::make_shared<CacheRow>(cache_row));
     }
     if (SG(request_info).request_method) {
         free((void *) SG(request_info).request_method);

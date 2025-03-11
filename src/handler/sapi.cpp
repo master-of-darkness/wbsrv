@@ -51,7 +51,7 @@ void EngineHandler::onEOM() noexcept {
     } else {
         const auto &cache_row = *cache_acc;
         ResponseBuilder builder(downstream_);
-        builder.status(200, "OK");
+        builder.status(STATUS_200);
         for (const auto &header: cache_row->headers)
             builder.header(header.first, header.second);
 
