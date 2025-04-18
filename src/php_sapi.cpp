@@ -140,8 +140,39 @@ void EmbedPHP::executeScript(const std::string &path, const std::unique_ptr<HTTP
     std::lock_guard<std::mutex> guard(m);
 #endif
 
+    // Setup cleanup handler to ensure resources are freed
+    static auto cleanup = [&]() {
+        if (SG(request_info).request_method) {
+            free((void *) SG(request_info).request_method);
+            SG(request_info).request_method = nullptr;
+        }
+        if (SG(request_info).request_uri) {
+            free(SG(request_info).request_uri);
+            SG(request_info).request_uri = nullptr;
+        }
+        if (SG(request_info).path_translated) {
+            free(SG(request_info).path_translated);
+            SG(request_info).path_translated = nullptr;
+        }
+        if (SG(request_info).query_string) {
+            free(SG(request_info).query_string);
+            SG(request_info).query_string = nullptr;
+        }
+        if (SG(request_info).cookie_data) {
+            free(SG(request_info).cookie_data);
+            SG(request_info).cookie_data = nullptr;
+        }
 
-    // TODO: 1. Implement a proper caching of request based on requested url
+        php_request_shutdown(nullptr);
+        thread_message_body = nullptr;
+        downstream_ = nullptr;
+        sapi_return.clear();
+        delete builder;
+        builder = nullptr;
+        headers_to_send.clear();
+    };
+
+    // Initialize request
     thread_http_message = *http_message;
     thread_web_root = std::move(web_root);
     embed_file_name = path;
@@ -153,33 +184,49 @@ void EmbedPHP::executeScript(const std::string &path, const std::unique_ptr<HTTP
     SG(sapi_started) = true;
     SG(post_read) = true;
 
-    php_request_startup();
+    if (php_request_startup() == FAILURE) {
+        cleanup();
+        builder->status(STATUS_500).body("PHP request startup failed").sendWithEOM();
+        return;
+    }
+
     SG(sapi_headers).http_response_code = 200;
 
-    if (const char *query_string = thread_http_message.getQueryStringAsStringPiece().data(); query_string != nullptr) {
+    // Set request info with proper error checking
+    if (const char *query_string = thread_http_message.getQueryStringAsStringPiece().data()) {
         SG(request_info).query_string = strdup(query_string);
     }
     SG(request_info).request_method = strdup(thread_http_message.getMethodString().c_str());
-
     SG(request_info).request_uri = strdup(thread_http_message.getURL().c_str());
     SG(request_info).path_translated = strdup(path.c_str());
+    zend_string *compiled_filename = zend_string_init(path.c_str(), path.length(), false);
+    zend_set_compiled_filename(compiled_filename);
+    zend_string_release(compiled_filename);
+
     const std::string &cookie = thread_http_message.getHeaders().getSingleOrEmpty("Cookie");
-    SG(request_info).cookie_data = cookie.empty() ? nullptr : strdup(cookie.c_str());
+    if (!cookie.empty()) {
+        SG(request_info).cookie_data = strdup(cookie.c_str());
+    }
+
     php_hash_environment();
 
     zend_file_handle file_handle;
-    zend_try
-        {
-            zend_stream_init_filename(&file_handle, path.c_str());
-            CG(skip_shebang) = true;
-            php_execute_script(&file_handle);
-        }
-    zend_end_try();
-    zend_destroy_file_handle(&file_handle);
+    zend_try {
+        zend_stream_init_filename(&file_handle, path.c_str());
+        CG(skip_shebang) = true;
+        php_execute_script(&file_handle);
+        zend_destroy_file_handle(&file_handle);
+    } zend_catch {
+        zend_destroy_file_handle(&file_handle);
+        builder->status(STATUS_500).body("PHP execution failed").sendWithEOM();
+        cleanup();
+        return;
+    } zend_end_try();
 
     if (PG(last_error_type) & E_FATAL_ERRORS && PG(last_error_message)) {
         builder->status(STATUS_500).body(ZSTR_VAL(PG(last_error_message))).sendWithEOM();
     } else {
+        // Handle successful execution
         builder->status(SG(sapi_headers).http_response_code, "Ok");
         CacheRow cache_row;
         for (const auto &[fst, snd]: headers_to_send) {
@@ -194,37 +241,10 @@ void EmbedPHP::executeScript(const std::string &path, const std::unique_ptr<HTTP
         cache_row.headers = headers_to_send;
         cache_row.text = sapi_return;
         cache_row.time_to_die = std::chrono::steady_clock::now() + std::chrono::seconds(CACHE_TTL);
-
         utils::cache.put(path, std::make_shared<CacheRow>(cache_row));
     }
-    if (SG(request_info).request_method) {
-        free((void *) SG(request_info).request_method);
-        SG(request_info).request_method = nullptr;
-    }
-    if (SG(request_info).request_uri) {
-        free(SG(request_info).request_uri);
-        SG(request_info).request_uri = nullptr;
-    }
-    if (SG(request_info).path_translated) {
-        free(SG(request_info).path_translated);
-        SG(request_info).path_translated = nullptr;
-    }
-    if (SG(request_info).query_string) {
-        free(SG(request_info).query_string);
-        SG(request_info).query_string = nullptr;
-    }
-    if (SG(request_info).cookie_data) {
-        free(SG(request_info).cookie_data);
-        SG(request_info).cookie_data = nullptr;
-    }
 
-    php_request_shutdown(nullptr);
-    thread_message_body = nullptr;
-    downstream_ = nullptr;
-    sapi_return.clear();
-    delete builder;
-    builder = nullptr;
-    headers_to_send.clear();
+    cleanup();
 }
 
 void EmbedPHP::Shutdown() {
