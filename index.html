@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>wbsrv - GitHub Pages</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f4f4f4;
+      color: #333;
+      font-size: 1.1rem;
+    }
+    header {
+      background: #222;
+      color: white;
+      padding: 1.1rem;
+      text-align: center;
+    }
+    main {
+      max-width: 1056px;
+      margin: auto;
+      padding: 2.2rem;
+      background: white;
+    }
+    h1 {
+      font-size: 2.2rem;
+    }
+    h2 {
+      font-size: 1.76rem;
+      border-bottom: 2px solid #ddd;
+      padding-bottom: 0.33rem;
+    }
+    .graph-gallery {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 1.1rem;
+      justify-content: center;
+      align-items: center;
+    }
+    .graph-gallery img {
+      width: 45%;
+      height: auto;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      object-fit: contain;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>wbsrv - Lightweight Web Server in C++</h1>
+    <p><a href="https://github.com/master-of-darkness/wbsrv" style="color: #0bf;">GitHub Repository</a></p>
+  </header>
+
+  <main>
+    <section>
+      <h2>About the Project</h2>
+      <p>
+        <strong>wbsrv</strong> is a minimal, fast, and embeddable web server written in C++. It's designed for high-performance, multi-threaded web serving.
+        <br><br>
+        Build guide is available in the repository README: <a href="https://github.com/master-of-darkness/wbsrv?tab=readme-ov-file#steps-to-build-on-ubuntu" style="color: #0bf;">Steps to build</a>
+      </p>
+    </section>
+
+    <section>
+      <h2>Key Advantages</h2>
+      <ul>
+        <li>Written in modern C++ with performance and safety in mind</li>
+        <li>Supports multi-threading and high-concurrency</li>
+        <li>Lightweight and easy to install</li>
+        <li>Supports PHP execution</li>
+        <li>Built-in caching system for pages</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Current Status</h2>
+      <p>
+        The project is under active development. Core HTTP handling and threading mechanisms are implemented. PHP embedding works, however is in progress and needs improvements. Planned future features include:
+        <ul>
+          <li>Better configuration system and flexibility</li>
+          <li>HTTP/3 support</li>
+          <li>Logging & monitoring tools</li>
+          <li>Extensions API for C++</li>
+        </ul>
+      </p>
+    </section>
+
+    <section>
+      <h2>Graph Visualization</h2>
+      <p>Below are graphs and metrics related to the performance.</p>
+      <div class="graph-gallery">
+        <img src="images/graph1.png" alt="Graph 1" style="display:inline-block;">
+        <img src="images/graph2.png" alt="Graph 2" style="display:inline-block;">
+      </div>
+    </section>
+  </main>
+
+</body>
+</html>
