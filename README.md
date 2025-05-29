@@ -41,13 +41,13 @@
 3. **Install Proxygen and other dependencies using Vcpkg:**
 
     ```sh
-    ./vcpkg install proxygen yaml-cpp onetbb
+    ./vcpkg install proxygen yaml-cpp
     ```
 
 4. **Clone the `wbsrv` repository:**
 
     ```sh
-    git clone https://github.com/yourusername/wbsrv.git
+    git clone https://github.com/master-of-darkness/wbsrv.git
     cd wbsrv
     ```
 
