@@ -1,7 +1,7 @@
 #include <filesystem>
 
-#include "vhost.h"
-#include "defines.h"
+#include "utils/vhost.h"
+#include "utils/defines.h"
 #include "config.h"
 
 

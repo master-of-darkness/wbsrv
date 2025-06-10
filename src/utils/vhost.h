@@ -4,7 +4,7 @@
 
 #include <utility>
 
-#include "utils.h"
+#include "utils/utils.h"
 
 namespace vhost {
     typedef struct vinfo_t {

@@ -34,44 +34,10 @@ find_package(benchmark REQUIRED)
 
 file(GLOB_RECURSE SRC "${CMAKE_SOURCE_DIR}/src/*.cpp")
 
-add_executable(${PROJECT_NAME} ${SRC}
-        include/concurrent_cache.h)
+add_executable(${PROJECT_NAME} ${SRC} include/interface.h)
 
-execute_process(
-        COMMAND php-config --includes
-        OUTPUT_VARIABLE PHP_INCLUDES
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
-# Split the result from php-config into an array
-separate_arguments(PHP_INCLUDE_DIRS UNIX_COMMAND "${PHP_INCLUDES}")
-# Remove the `-I` from each include paphpath
-set(PROCESSED_INCLUDE_DIRS "")
-foreach(INCLUDE_DIR ${PHP_INCLUDE_DIRS})
-    string(REGEX REPLACE "^-I" "" CLEANED_INCLUDE_DIR ${INCLUDE_DIR})  # Remove the -I
-    list(APPEND PROCESSED_INCLUDE_DIRS ${CLEANED_INCLUDE_DIR})  # Add to new list
-endforeach()
-
-
-# custom php build test
-set(PROCESSED_INCLUDE_DIRS "deps/php-src/" "deps/php-src/main" "deps/php-src/sapi" "deps/php-src/TSRM" "deps/php-src/Zend")
-
-find_library(PHP_EMBED_LIB
-        NAMES libphp.so
-        HINTS
-        /usr/lib
-        /usr/local/lib
-        /usr/lib64
-        /usr/local/lib64
-        /opt/php/lib
-)
-
-# custom php build test
-set(PHP_EMBED_LIB ${CMAKE_SOURCE_DIR}/deps/php-src/libs/libphp.so)
-
-message("PHP Library: ${PHP_EMBED_LIB}")
 target_include_directories(${PROJECT_NAME} PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
         ${PROCESSED_INCLUDE_DIRS}
 )
 
@@ -80,10 +46,26 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         proxygen::proxygen
         proxygen::proxygenhttpserver
         yaml-cpp::yaml-cpp
-        ${PHP_EMBED_LIB})
+#        ${PHP_EMBED_LIB}
+)
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE $<$<CONFIG:Debug>:DEBUG>)
 
 # Link Google Benchmark
-add_executable(benchmark_concurrent_lru_cache tests/benchmark_concurrent_lru_cache.cpp include/concurrent_cache.h)
+add_executable(benchmark_concurrent_lru_cache tests/benchmark_concurrent_lru_cache.cpp src/utils/concurrent_cache.h)
 target_link_libraries(benchmark_concurrent_lru_cache benchmark::benchmark)
+
+add_library(test_plugin SHARED tests/plugin/ExamplePlugin.cpp tests/plugin/ExamplePlugin.h include/interface.h)
+
+
+# PHP plugin support
+add_library(php_plugin SHARED include/interface.h php_ext/php_ext.cpp php_ext/php_ext.h)
+target_include_directories(php_plugin PRIVATE
+        php_ext/php-src/
+        php_ext/php-src/main
+        php_ext/php-src/sapi
+        php_ext/php-src/TSRM
+        php_ext/php-src/Zend
+        php_ext/php-src/ext
+)
+target_link_libraries(php_plugin PRIVATE ${CMAKE_SOURCE_DIR}/php_ext/php-src/libs/libphp.so)

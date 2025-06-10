@@ -10,14 +10,12 @@
 #include <syslog.h>
 #endif
 
-#include "handler/static.h"
-#include "handler/sapi.h"
-#include "handler/error.h"
+#include "server/server.h"
 
-#include "defines.h"
+#include "utils/defines.h"
 #include "config.h"
-#include "vhost.h"
-#include "php_sapi.h"
+#include "ext/plugin_loader.h"
+#include "utils/vhost.h"
 
 using namespace proxygen;
 
@@ -29,14 +27,12 @@ public:
     void onServerStop() noexcept override {
     }
 
-    RequestHandler *onRequest(RequestHandler *, HTTPMessage *message) noexcept override {
+    RequestHandler *onRequest(RequestHandler *requestHandler, HTTPMessage *message) noexcept override {
         const std::string hostname = message->getHeaders().getSingleOrEmpty(HTTP_HEADER_HOST);
         auto vhostAccessor = vhost::list.get(hostname);
 
-        if (!vhost::list.get(hostname).has_value())
-            return new ErrorHandler(400);
-
         auto path = vhostAccessor->web_dir + message->getPath();
+        std::unordered_map<std::string, std::string> headers;
 
         if (std::filesystem::is_directory(path)) {
             for (const auto &index_page: vhostAccessor->index_pages) {
@@ -48,9 +44,7 @@ public:
             }
         }
 
-        if (const size_t len = path.size(); path[len - 1] != 'p' && path[len - 2] != 'h' && path[len - 3] != 'p')
-            return new StaticHandler(path);
-        return new EngineHandler(path, vhostAccessor->web_dir);
+        return new StaticHandler(path, vhostAccessor->web_dir);
     }
 };
 
@@ -59,6 +53,7 @@ int main(int argc, char *argv[]) {
     auto _ = folly::Init(&argc, &argv, true);
 
 #ifndef DEBUG
+
     pid_t pid, sid;
 
     pid = fork();
@@ -69,24 +64,15 @@ int main(int argc, char *argv[]) {
     }
     umask(0);
 
-    openlog(DAEMON_NAME, LOG_NOWAIT | LOG_PID, LOG_USER);
-    syslog(LOG_NOTICE, "Successfully started" DAEMON_NAME);
-
     sid = setsid();
     if (sid < 0) {
-        syslog(LOG_ERR, "Could not generate session ID for child process");
         exit(EXIT_FAILURE);
     }
 
-    if ((chdir("/")) < 0) {
-        syslog(LOG_ERR, "Could not change working directory to /");
+    // if ((chdir("/")) < 0) {
+    //     exit(EXIT_FAILURE);
+    // }
 
-        exit(EXIT_FAILURE);
-    }
-
-    close(STDIN_FILENO);
-    close(STDOUT_FILENO);
-    close(STDERR_FILENO);
 #endif
 
     config::general general_config(CONFIG_DIR);
@@ -97,6 +83,9 @@ int main(int argc, char *argv[]) {
     if (!vhost::load(IPs))
         return -1;
 
+    plugin_loader->loadPluginsFromDirectory("./");
+    plugin_loader->initializeAllPlugins();
+
     HTTPServerOptions options;
     options.threads = static_cast<size_t>(general_config.threads);
     options.idleTimeout = std::chrono::milliseconds(60000);
@@ -106,8 +95,6 @@ int main(int argc, char *argv[]) {
             RequestHandlerChain().addThen<HandlerFactory>().build();
     options.h2cEnabled = true;
 
-    EmbedPHP::Initialize(general_config.threads);
-
     auto diskIOThreadPool = std::make_shared<folly::CPUThreadPoolExecutor>(
         general_config.threads,
         std::make_shared<folly::NamedThreadFactory>("StaticDiskIOThread"));
@@ -116,17 +103,13 @@ int main(int argc, char *argv[]) {
     HTTPServer server(std::move(options));
     server.bind(IPs);
 
-    // Start HTTPServer mainloop in a separate thread
     std::thread t([&]() { server.start(); });
 
     t.join();
 
-    EmbedPHP::Shutdown();
-#ifndef DEBUG
-    syslog(LOG_NOTICE, "Stopping" DAEMON_NAME);
-    closelog();
-    exit(EXIT_SUCCESS);
-#endif
+    #ifndef DEBUG
+        exit(EXIT_SUCCESS);
+    #endif
 
     return 0;
 }

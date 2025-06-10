@@ -1,16 +1,15 @@
 #pragma once
 
-#include "common.h"
-#include "vhost.h"
+#include "utils/vhost.h"
 
 class StaticHandler : public proxygen::RequestHandler {
 public:
-    explicit StaticHandler(std::string path):
-        path_(std::move(path)) {
+    explicit StaticHandler(std::string path, std::string web_root = ""):
+        path_(std::move(path)),  web_root_(std::move(web_root)){
     }
 
     void onRequest(
-        std::unique_ptr<proxygen::HTTPMessage> headers) noexcept override;
+        std::unique_ptr<proxygen::HTTPMessage> message) noexcept override;
 
     void onUpgrade(proxygen::UpgradeProtocol proto) noexcept override;
 
@@ -27,7 +26,7 @@ public:
     void onBody(std::unique_ptr<folly::IOBuf> body) noexcept override;
 
 private:
-    void readFile(folly::EventBase *evb);
+    void readFile();
 
     bool checkForCompletion();
 
@@ -39,6 +38,8 @@ private:
 
     std::string path_;
 
+    std::string web_root_;
+
     std::unique_ptr<folly::File> file_;
 
     bool readFileScheduled_{false};
@@ -48,4 +49,6 @@ private:
     bool finished_{false};
 
     std::atomic<bool> error_{false};
+
+    folly::EventBase* event_base_;
 };

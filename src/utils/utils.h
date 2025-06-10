@@ -1,8 +1,7 @@
 #pragma once
 
 #include <folly/Range.h>
-#include "concurrent_cache.h"
-#include "handler/common.h"
+#include "utils/concurrent_cache.h"
 
 struct CacheRow {
     bool operator!=(const CacheRow &rhs) const {
