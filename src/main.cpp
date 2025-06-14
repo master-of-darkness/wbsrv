@@ -75,7 +75,7 @@ int main(int argc, char *argv[]) {
 
 #endif
 
-    config::general general_config(CONFIG_DIR);
+    Config::GeneralConfig general_config(CONFIG_DIR);
     if (!general_config.load())
         return -1;
 
@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
     if (!vhost::load(IPs))
         return -1;
 
-    plugin_loader->loadPluginsFromDirectory("./");
+    plugin_loader->loadPluginsFromDirectory("./"); // TODO: make this configurable
     plugin_loader->initializeAllPlugins();
 
     HTTPServerOptions options;
@@ -107,9 +107,9 @@ int main(int argc, char *argv[]) {
 
     t.join();
 
-    #ifndef DEBUG
-        exit(EXIT_SUCCESS);
-    #endif
+#ifndef DEBUG
+    exit(EXIT_SUCCESS);
+#endif
 
     return 0;
 }

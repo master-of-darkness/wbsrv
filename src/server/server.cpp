@@ -15,15 +15,15 @@ void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> message) noexcept {
     auto cache_acc = utils::cache.get(path_);
 
     // Check if the path is already cached
-    if (cache_acc.has_value()) {
+    if (cache_acc) {
         const auto &cache_row = *cache_acc;
-        if (cache_row->time_to_die <= std::chrono::steady_clock::now()) {
+        if (cache_row.time_to_die <= std::chrono::steady_clock::now()) {
             utils::cache.remove(path_);
         } else {
             ResponseBuilder(downstream_)
                     .status(STATUS_200)
-                    .header("Content-Type", cache_row->content_type)
-                    .body(cache_row->text)
+                    .header("Content-Type", cache_row.content_type)
+                    .body(cache_row.text)
                     .sendWithEOM();
             return;
         }
@@ -115,7 +115,7 @@ void StaticHandler::readFile() {
                     row.content_type = _temp_content_type;
                     row.text = accumulated_text;
                     row.time_to_die = std::chrono::steady_clock::now() + std::chrono::seconds(CACHE_TTL);
-                    utils::cache.put(path_, std::make_shared<CacheRow>(row));
+                    utils::cache.put(path_, row);
 
                     ResponseBuilder(downstream_).sendWithEOM();
                 }
@@ -145,7 +145,6 @@ void StaticHandler::readFile() {
 }
 
 void StaticHandler::onEgressPaused() noexcept {
-    // This will terminate readFile soon
     paused_ = true;
 }
 
@@ -161,11 +160,10 @@ void StaticHandler::onEgressResumed() noexcept {
 }
 
 void StaticHandler::onEOM() noexcept {
-    // Request body fully received
 }
 
 void StaticHandler::onBody(std::unique_ptr<folly::IOBuf> body) noexcept {
-    // Handle request body chunks
+    // TODO: Message body recieved
 }
 
 void StaticHandler::onUpgrade(UpgradeProtocol /*protocol*/) noexcept {

@@ -10,7 +10,7 @@ utils::ConcurrentLRUCache<std::string, vhost::vinfo> vhost::list(256);
 bool vhost::load(std::vector<proxygen::HTTPServer::IPConfig> &config) {
     for (const auto &i: std::filesystem::directory_iterator(std::string(CONFIG_DIR) + "/hosts")) {
         if (i.path().extension() == ".yaml") {
-            config::vhost host(i.path().string());
+            Config::VirtualHost host(i.path().string());
             if (host.load()) {
                 proxygen::HTTPServer::IPConfig vhost(folly::SocketAddress("0.0.0.0", host.port, false),
                                                      proxygen::HTTPServer::Protocol::HTTP);

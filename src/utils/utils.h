@@ -15,7 +15,7 @@ struct CacheRow {
 };
 
 namespace utils {
-    extern ConcurrentLRUCache<std::string, std::shared_ptr<CacheRow> > cache;
+    extern ConcurrentLRUCache<std::string, CacheRow> cache;
 
     const char *getContentType(const std::string &path);
 

@@ -1,6 +1,6 @@
 #include "utils.h"
 
-utils::ConcurrentLRUCache<std::string, std::shared_ptr<CacheRow> > utils::cache(256);
+utils::ConcurrentLRUCache<std::string, CacheRow> utils::cache(256);
 
 constexpr std::pair<const char *, const char *> contentTypes[] = {
     {".html", "text/html"},

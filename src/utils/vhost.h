@@ -10,12 +10,11 @@ namespace vhost {
     typedef struct vinfo_t {
         std::string web_dir;
         std::vector<std::string> index_pages;
-        bool fastcgi_enable = false;
 
         vinfo_t();
 
-        vinfo_t(std::string web_dir, const std::vector<std::string> &index_pages): // fcgi: false
-            web_dir(std::move(web_dir)), index_pages(index_pages) {
+        vinfo_t(std::string web_dir, const std::vector<std::string> &index_pages): web_dir(std::move(web_dir)),
+            index_pages(index_pages) {
         }
     } vinfo;
 

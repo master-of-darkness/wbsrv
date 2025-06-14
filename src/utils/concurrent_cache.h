@@ -17,32 +17,32 @@ namespace utils {
         }
 
         // Retrieve a value from the cache (thread-safe read with shared lock)
-        std::optional<Value> get(const Key &key) {
+        const Value *get(const Key &key) {
             size_t shard = getShard(key);
             std::shared_lock lock(shards_[shard].mutex);
             auto it = shards_[shard].map.find(key);
             if (it == shards_[shard].map.end()) {
-                return std::nullopt;
+                return nullptr;
             }
             // Move accessed item to front (most recently used)
             shards_[shard].items.splice(shards_[shard].items.begin(), shards_[shard].items, it->second);
-            return it->second->second;
+            return &(it->second->second);
         }
 
         // Insert or update a key-value pair (thread-safe write with exclusive lock)
-        void put(const Key &key, const Value &value) {
+        void put(const Key &key, Value &&value) {
             size_t shard = getShard(key);
             std::unique_lock lock(shards_[shard].mutex);
 
             auto it = shards_[shard].map.find(key);
             if (it != shards_[shard].map.end()) {
-                it->second->second = value;
+                it->second->second = std::move(value);
                 shards_[shard].items.splice(shards_[shard].items.begin(), shards_[shard].items, it->second);
                 return;
             }
 
             // Insert new key-value pair
-            shards_[shard].items.emplace_front(key, value);
+            shards_[shard].items.emplace_front(key, std::move(value));
             shards_[shard].map[key] = shards_[shard].items.begin();
 
             // Eviction if capacity exceeded
@@ -52,6 +52,12 @@ namespace utils {
                 shards_[shard].map.erase(last->first);
                 shards_[shard].items.pop_back();
             }
+        }
+
+        // Overload for copy-constructible types
+        void put(const Key &key, const Value &value) {
+            Value copy = value;
+            put(key, std::move(copy));
         }
 
         // Remove a key from the cache (thread-safe delete)
@@ -65,8 +71,18 @@ namespace utils {
             }
         }
 
-        int size() {
+        int size() const {
             return shards_.size();
+        }
+
+        template<typename Func>
+        void forEach(Func &&func) const {
+            for (size_t i = 0; i < SHARD_COUNT; ++i) {
+                std::shared_lock lock(shards_[i].mutex);
+                for (const auto &item: shards_[i].items) {
+                    func(item.first, item.second);
+                }
+            }
         }
 
     private:

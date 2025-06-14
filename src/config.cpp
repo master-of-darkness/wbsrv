@@ -1,9 +1,9 @@
 #include "config.h"
 
 #include <glog/logging.h>
-using namespace config;
+using namespace Config;
 
-bool general::load() {
+bool GeneralConfig::load() {
     try {
         YAML::Node config = YAML::LoadFile(this->path_ + "/server.yaml");
         if (!config.IsNull()) {
@@ -17,17 +17,8 @@ bool general::load() {
     }
 }
 
-/**
- * @brief Loads the virtual host configuration.
- *
- * This function is responsible for loading the virtual host
- * configuration from the specified files and initializing
- * the necessary components.
- *
- * @param configPath The path to the configuration file.
- * @return true if the configuration is successfully loaded, false otherwise.
- */
-bool vhost::load() {
+
+bool VirtualHost::load() {
     YAML::Node config = YAML::LoadFile(this->path_);
     if (!config.IsNull()) {
         this->www_dir = config["www_dir"].as<std::string>();

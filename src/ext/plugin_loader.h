@@ -1,15 +1,7 @@
 #pragma once
-#include <memory>
-#include <string>
-#include <unordered_map>
-#include <vector>
-#include <future>
-#include <functional>
-#include <thread>
-#include <mutex>
-#include <condition_variable>
 #include <filesystem>
 #include "../include/interface.h"
+#include "utils/concurrent_cache.h"
 #include <dlfcn.h>
 #include "proxygen/httpserver/HTTPServer.h"
 #define LIBRARY_HANDLE void*
@@ -19,99 +11,154 @@
 #define LIBRARY_EXTENSION ".so"
 
 
-// Plugin information structure
 struct PluginInfo {
     std::string name;
     std::string version;
     std::string filePath;
     LIBRARY_HANDLE handle;
-    std::unique_ptr<IPlugin> instance;
+    IPlugin *instance;
     CreatePluginFunc createFunc;
     DestroyPluginFunc destroyFunc;
-    bool isLoaded;
-    bool isInitialized;
+    std::atomic<bool> isLoaded{false};
+    std::atomic<bool> isInitialized{false};
+
+    PluginInfo() = default;
+
+    PluginInfo(const PluginInfo &) = delete;
+
+    PluginInfo &operator=(const PluginInfo &) = delete;
+
+    PluginInfo(PluginInfo &&other) noexcept
+        : name(std::move(other.name))
+          , version(std::move(other.version))
+          , filePath(std::move(other.filePath))
+          , handle(other.handle)
+          , instance(other.instance)
+          , createFunc(other.createFunc)
+          , destroyFunc(other.destroyFunc)
+          , isLoaded(other.isLoaded.load())
+          , isInitialized(other.isInitialized.load()) {
+        other.handle = nullptr;
+        other.instance = nullptr;
+        other.createFunc = nullptr;
+        other.destroyFunc = nullptr;
+    }
+
+    PluginInfo &operator=(PluginInfo &&other) noexcept {
+        if (this != &other) {
+            name = std::move(other.name);
+            version = std::move(other.version);
+            filePath = std::move(other.filePath);
+            handle = other.handle;
+            instance = other.instance;
+            createFunc = other.createFunc;
+            destroyFunc = other.destroyFunc;
+            isLoaded.store(other.isLoaded.load());
+            isInitialized.store(other.isInitialized.load());
+
+            other.handle = nullptr;
+            other.instance = nullptr;
+            other.createFunc = nullptr;
+            other.destroyFunc = nullptr;
+        }
+        return *this;
+    }
 };
 
-// Plugin loader class
 class PluginLoader {
 public:
     PluginLoader();
+
     ~PluginLoader();
 
-    // Core functionality
-    bool loadPlugin(const std::string& filePath);
-    bool unloadPlugin(const std::string& pluginName);
+    bool loadPlugin(const std::string &filePath);
+
+    bool unloadPlugin(const std::string &pluginName);
+
     void unloadAllPlugins();
-    
-    // Directory operations
-    bool loadPluginsFromDirectory(const std::string& directory);
-    void scanDirectory(const std::string& directory, std::vector<std::string>& pluginFiles);
-    
-    // Plugin management
-    bool initializePlugin(const std::string& pluginName);
-    bool shutdownPlugin(const std::string& pluginName);
+
+    bool loadPluginsFromDirectory(const std::string &directory);
+
+    bool initializePlugin(const std::string &pluginName);
+
+    bool shutdownPlugin(const std::string &pluginName);
+
     void initializeAllPlugins();
+
     void shutdownAllPlugins();
-    
-    // Query operations
-    std::vector<std::string> getLoadedPluginNames() const;
-    std::vector<std::string> getInitializedPluginNames() const;
-    PluginInfo* getPluginInfo(const std::string& pluginName);
-    const PluginInfo* getPluginInfo(const std::string& pluginName) const;
-    IPlugin* getPlugin(const std::string& pluginName);
-    
-    // Request handling
-    HttpResponse routeRequest(const HttpRequest& request);
 
-    // Utility
-    bool isPluginLoaded(const std::string& pluginName) const;
-    bool isPluginInitialized(const std::string& pluginName) const;
-    size_t getLoadedPluginCount() const;
+    IPlugin *getPlugin(const std::string &pluginName);
 
-    // Error handling
-    std::string getLastError() const;
-    void clearLastError();
+    HttpResponse routeRequest(const HttpRequest &request);
+
+    static std::string getLastError();
+
+    static void clearLastError();
 
 private:
-    mutable std::mutex pluginsMutex_;
-    std::unordered_map<std::string, std::unique_ptr<PluginInfo>> plugins_;
-    std::string lastError_;
-    
-    // Helper methods
-    bool loadLibrary(const std::string& filePath, LIBRARY_HANDLE& handle);
-    bool getFunctionPointers(LIBRARY_HANDLE handle, CreatePluginFunc& createFunc, DestroyPluginFunc& destroyFunc);
-    void setLastError(const std::string& error);
-    std::string getSystemError() const;
-    bool isValidPluginFile(const std::string& filePath) const;
+    utils::ConcurrentLRUCache<std::string, PluginInfo> plugins_{1000};
+
+    utils::ConcurrentLRUCache<std::string, IPlugin *> pluginInstanceCache_{1000};
+    utils::ConcurrentLRUCache<std::string, std::string> routeToPluginCache_{5000};
+
+    std::atomic<size_t> loadedPluginCount_{0};
+    std::atomic<size_t> initializedPluginCount_{0};
+
+    thread_local static std::string lastError_;
+
+    void scanDirectory(const std::string &directory, std::vector<std::string> &pluginFiles) const;
+
+    static bool loadLibrary(const std::string &filePath, LIBRARY_HANDLE&handle);
+
+    static bool getFunctionPointers(LIBRARY_HANDLE handle, CreatePluginFunc &createFunc,
+                                    DestroyPluginFunc &destroyFunc);
+
+    static bool isValidPluginFile(const std::string &filePath);
+
+    static std::string getSystemError();
+
+    static void setLastError(const std::string &error);
+
+    void updatePluginCache(const std::string &pluginName, IPlugin *plugin);
+
+    void invalidatePluginCache(const std::string &pluginName);
+
+    void invalidateRouteCache();
+
+    PluginInfo createPluginInfo(const std::string &filePath,
+                                LIBRARY_HANDLE handle,
+                                CreatePluginFunc createFunc,
+                                DestroyPluginFunc destroyFunc);
 };
 
 inline std::unique_ptr<PluginLoader> plugin_loader = std::make_unique<PluginLoader>();
 
 class ProxygenHeadersAdapter : public IHeaders {
 private:
-    const proxygen::HTTPHeaders& headers_;
+    const proxygen::HTTPHeaders &headers_;
 
 public:
-    ProxygenHeadersAdapter(const proxygen::HTTPHeaders& headers) : headers_(headers) {}
+    ProxygenHeadersAdapter(const proxygen::HTTPHeaders &headers) : headers_(headers) {
+    }
 
-    std::string get(const std::string& name) const override {
+    std::string get(const std::string &name) const override {
         return headers_.getSingleOrEmpty(name);
     }
 
-    bool exists(const std::string& name) const override {
+    bool exists(const std::string &name) const override {
         return headers_.exists(name);
     }
 
-    std::vector<std::string> getAll(const std::string& name) const override {
+    std::vector<std::string> getAll(const std::string &name) const override {
         std::vector<std::string> values;
-        headers_.forEachValueOfHeader(name, [&](const std::string& value) {
+        headers_.forEachValueOfHeader(name, [&](const std::string &value) {
             values.push_back(value);
             return false;
         });
         return values;
     }
 
-    void forEach(std::function<void(const std::string&, const std::string&)> callback) const override {
+    void forEach(std::function<void(const std::string &, const std::string &)> callback) const override {
         headers_.forEach(callback);
     }
 
