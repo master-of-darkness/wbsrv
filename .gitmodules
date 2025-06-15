@@ -1,4 +1,0 @@
-[submodule "plugins/php_ext/php-src"]
-	path = plugins/php_ext/php-src
-	url = https://github.com/php/php-src.git
-    branch = PHP-8.4.8
