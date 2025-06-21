@@ -267,9 +267,9 @@ IPlugin *PluginLoader::getPlugin(const std::string &pluginName) {
     return nullptr;
 }
 
-HttpResponse PluginLoader::routeRequest(const HttpRequest &request) {
+HttpResponse PluginLoader::routeRequest(HttpRequest *request) {
     // First, try cached route -> plugin mapping
-    auto cachedPluginName = routeToPluginCache_.get(request.path);
+    auto cachedPluginName = routeToPluginCache_.get(request->path);
     if (cachedPluginName) {
         auto cachedPlugin = pluginInstanceCache_.get(*cachedPluginName);
         if (cachedPlugin) {
@@ -279,11 +279,11 @@ HttpResponse PluginLoader::routeRequest(const HttpRequest &request) {
                     return response;
                 }
                 // Plugin no longer handles this route, remove from cache
-                routeToPluginCache_.remove(request.path);
+                routeToPluginCache_.remove(request->path);
             } catch (const std::exception &e) {
                 LOG(ERROR) << "Exception in cached plugin " << *cachedPluginName << ": " << e.what();
                 invalidatePluginCache(*cachedPluginName);
-                routeToPluginCache_.remove(request.path);
+                routeToPluginCache_.remove(request->path);
             }
         }
     }
@@ -299,7 +299,7 @@ HttpResponse PluginLoader::routeRequest(const HttpRequest &request) {
                 HttpResponse response = plugin->handleRequest(request);
                 if (response.handled) {
                     // Cache successful route mapping
-                    routeToPluginCache_.put(request.path, name);
+                    routeToPluginCache_.put(request->path, name);
                     updatePluginCache(name, plugin);
                     foundResponse = response;
                     responseFound = true;
@@ -321,7 +321,7 @@ HttpResponse PluginLoader::routeRequest(const HttpRequest &request) {
     // No plugin could handle the request
     HttpResponse response;
     response.statusCode = 404;
-    response.body = "No plugin found to handle request: " + request.path;
+    response.body = "No plugin found to handle request: " + request->path;
     response.headers["Content-Type"] = "text/plain";
     response.handled = false;
     return response;
@@ -432,3 +432,4 @@ PluginInfo PluginLoader::createPluginInfo(const std::string &filePath,
 
     return info;
 }
+

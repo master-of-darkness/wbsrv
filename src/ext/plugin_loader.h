@@ -89,7 +89,7 @@ public:
 
     IPlugin *getPlugin(const std::string &pluginName);
 
-    HttpResponse routeRequest(const HttpRequest &request);
+    HttpResponse routeRequest(HttpRequest *request);
 
     static std::string getLastError();
 
@@ -164,5 +164,34 @@ public:
 
     size_t size() const override {
         return headers_.size();
+    }
+};
+
+class FollyBodyImpl : public IBody {
+private:
+    std::unique_ptr<folly::IOBuf> iobuf_;
+
+public:
+    explicit FollyBodyImpl(std::unique_ptr<folly::IOBuf> iobuf)
+        : iobuf_(std::move(iobuf)) {}
+
+    const char* data() const override {
+        return reinterpret_cast<const char*>(iobuf_->data());
+    }
+
+    size_t size() const override {
+        return iobuf_->length();
+    }
+
+    bool empty() const override {
+        return !iobuf_ || iobuf_->empty();
+    }
+
+    std::string toString() const override {
+        return iobuf_->toString();
+    }
+
+    std::string_view view() const override {
+        return std::string_view(data(), size());
     }
 };

@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
     if (!vhost::load(IPs))
         return -1;
 
-    plugin_loader->loadPluginsFromDirectory("./"); // TODO: make this configurable
+    plugin_loader->loadPluginsFromDirectory("../plugins"); // TODO: make this configurable
     plugin_loader->initializeAllPlugins();
 
     HTTPServerOptions options;
