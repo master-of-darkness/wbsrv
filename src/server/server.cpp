@@ -133,6 +133,7 @@ void StaticHandler::handlePHPRequest(PluginManager::HttpMethod method, const std
         response.setStatus(404, "Not Found");
         response.setTextContent();
         response.body = utils::getErrorPage(404);
+        response.headers["Content-Type"] = "text/html";
     }
 
     event_base_->runInEventBaseThread([this, response = std::move(response), context]() {
