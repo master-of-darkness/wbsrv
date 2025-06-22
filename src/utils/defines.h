@@ -17,7 +17,7 @@
 #define DAEMON_NAME "webserver"
 #define DEFAULTPAGE_FILENAME "index.html"
 #define VERSION "1.2"
-#define NAME_N_VERSION "wbsrv 1.2"
+#define NAME_N_VERSION "wbsrv rc"
 
 #define CACHE_TTL 300 // 5 minutes
 

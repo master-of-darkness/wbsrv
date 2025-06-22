@@ -1,4 +1,8 @@
 #include <algorithm>
+#include <cstring>
+#include <iostream>
+#include <sstream>
+#include <memory>
 
 #include "interface.h"
 #include <main/php.h>
@@ -6,12 +10,13 @@
 #include <main/php_main.h>
 #include <main/php_variables.h>
 #include <zend_ini.h>
-#include <iostream>
-#include <sstream>
+
+using namespace PluginManager;
 
 thread_local std::stringstream *current_output_buffer = nullptr;
 thread_local std::unordered_map<std::string, std::string> tl_headers_to_send;
-thread_local HttpRequest *tl_req;
+thread_local RequestContext *tl_context = nullptr;
+thread_local volatile size_t read_post_offset = 0;
 
 HttpMethod stringToHttpMethod(const std::string &method) {
     if (method == "GET") return HttpMethod::GET;
@@ -21,13 +26,9 @@ HttpMethod stringToHttpMethod(const std::string &method) {
     if (method == "HEAD") return HttpMethod::HEAD;
     if (method == "OPTIONS") return HttpMethod::OPTIONS;
     if (method == "PATCH") return HttpMethod::PATCH;
-    if (method == "TRACE") return HttpMethod::TRACE;
     if (method == "CONNECT") return HttpMethod::CONNECT;
-    if (method == "CONNECT_UDP") return HttpMethod::CONNECT_UDP;
-    if (method == "SUB") return HttpMethod::SUB;
-    if (method == "PUB") return HttpMethod::PUB;
-    if (method == "UNSUB") return HttpMethod::UNSUB;
-    return HttpMethod::GET; // Default fallback
+    if (method == "TRACE") return HttpMethod::TRACE;
+    return HttpMethod::UNKNOWN;
 }
 
 std::string httpMethodToString(HttpMethod method) {
@@ -41,10 +42,6 @@ std::string httpMethodToString(HttpMethod method) {
         case HttpMethod::PATCH: return "PATCH";
         case HttpMethod::TRACE: return "TRACE";
         case HttpMethod::CONNECT: return "CONNECT";
-        case HttpMethod::CONNECT_UDP: return "CONNECT-UDP";
-        case HttpMethod::SUB: return "SUB";
-        case HttpMethod::PUB: return "PUB";
-        case HttpMethod::UNSUB: return "UNSUB";
         default: return "GET";
     }
 }
@@ -60,6 +57,7 @@ std::pair<std::string, std::string> extractHeaderAndValue(const sapi_header_stru
     const char *start = h->header;
     const char *end = h->header + h->header_len;
     const char *colon_pos = nullptr;
+
     for (const char *it = start; it < end; ++it) {
         if (*it == ':') {
             colon_pos = it;
@@ -78,30 +76,31 @@ std::pair<std::string, std::string> extractHeaderAndValue(const sapi_header_stru
     }
 
     const char *value_end = end;
-    while (value_end > value_start && (*(value_end - 1) == ' ' || *(value_end - 1) == '\t' || *(value_end - 1) == '\r'
-                                       || *(value_end - 1) == '\n')) {
+    while (value_end > value_start && (*(value_end - 1) == ' ' || *(value_end - 1) == '\t' ||
+                                       *(value_end - 1) == '\r' || *(value_end - 1) == '\n')) {
         --value_end;
     }
 
     std::string value(value_start, value_end);
-
     return {header, value};
 }
 
-static int php_embed_startup(sapi_module_struct *sapi_module) {
+static int wbsrv_php_startup(sapi_module_struct *sapi_module) {
     return php_module_startup(sapi_module, nullptr);
 }
 
-static int php_embed_deactivate(void) {
+static int wbsrv_php_deactivate(void) {
     return SUCCESS;
 }
 
-static size_t php_embed_ub_write(const char *str, size_t str_length) {
-    current_output_buffer->write(str, str_length);
+static size_t wbsrv_php_ub_write(const char *str, size_t str_length) {
+    if (current_output_buffer) {
+        current_output_buffer->write(str, str_length);
+    }
     return str_length;
 }
 
-static int php_embed_header_handler(sapi_header_struct *sapi_header,
+static int wbsrv_php_header_handler(sapi_header_struct *sapi_header,
                                     sapi_header_op_enum op,
                                     sapi_headers_struct *sapi_headers) {
     if (!sapi_header) {
@@ -109,7 +108,6 @@ static int php_embed_header_handler(sapi_header_struct *sapi_header,
     }
 
     auto [header, value] = extractHeaderAndValue(sapi_header);
-
     auto &headers_map = tl_headers_to_send;
 
     switch (op) {
@@ -130,135 +128,133 @@ static int php_embed_header_handler(sapi_header_struct *sapi_header,
     return SUCCESS;
 }
 
-static size_t read_post_offset = 0; // Global state to track position
-
-static size_t php_embed_read_post(char *buffer, size_t count_bytes) {
-    if (!tl_req || !tl_req->body || tl_req->body->empty() || !buffer || count_bytes == 0)
+static size_t wbsrv_php_read_post(char *buffer, size_t count_bytes) {
+    if (!tl_context || !tl_context->request || tl_context->request->body.empty() ||
+        !buffer || count_bytes == 0) {
         return 0;
+    }
 
-    const char *body_data = tl_req->body->data();
-    size_t body_size = tl_req->body->size();
+    const char *body_data = tl_context->request->body.data();
+    size_t body_size = tl_context->request->body.size();
 
-    // Check if we've already read everything
-    if (read_post_offset >= body_size)
+    if (read_post_offset >= body_size) {
         return 0;
+    }
 
-    // Calculate how much we can read
     size_t available = body_size - read_post_offset;
     size_t to_read = std::min(count_bytes, available);
 
-    // Copy the data
-    memcpy(buffer, body_data + read_post_offset, to_read);
-
-    // Update global position
+    std::memcpy(buffer, body_data + read_post_offset, to_read);
     read_post_offset += to_read;
 
     return to_read;
 }
 
-void php_register_variables(zval *track_vars_array) {
-    if (!track_vars_array) {
+void wbsrv_php_register_variables(zval *track_vars_array) {
+    if (!track_vars_array || !tl_context || !tl_context->request) {
         return;
     }
+
+    HttpRequest *req = tl_context->request;
     php_import_environment_variables(track_vars_array);
 
-    // php_register_variable("DOCUMENT_ROOT", tl_req->web_root.c_str(), track_vars_array);
-    // php_register_variable("REQUEST_URI", tl_req->path.c_str(), track_vars_array);
-    // php_register_variable("REQUEST_METHOD", httpMethodToString(tl_req->method).c_str(), track_vars_array);
-    //
-    // php_register_variable("SERVER_NAME", "localhost", track_vars_array);
-    // php_register_variable("SERVER_PORT", "80", track_vars_array);
-    // php_register_variable("SERVER_SOFTWARE", "PHP Plugin Server/1.0", track_vars_array);
-
-    if (tl_req->body && !tl_req->body->empty()) {
-        php_register_variable("CONTENT_LENGTH", std::to_string(tl_req->body->size()).c_str(), track_vars_array);
+    std::string doc_root = "/var/www/html";
+    if (tl_context->hasMetadata("document_root")) {
+        doc_root = tl_context->getMetadata("document_root").asString();
     }
 
-    std::string content_type = tl_req->getHeader("Content-Type");
+    php_register_variable("DOCUMENT_ROOT", doc_root.c_str(), track_vars_array);
+    php_register_variable("REQUEST_URI", (req->path + req->query).c_str(), track_vars_array);
+    php_register_variable("REQUEST_METHOD", httpMethodToString(req->method).c_str(), track_vars_array);
+    php_register_variable("SERVER_SOFTWARE", "WBSRV/2.0 PHP Extension", track_vars_array);
+    php_register_variable("PHP_SELF", req->path.c_str(), track_vars_array);
+    php_register_variable("QUERY_STRING", req->query.c_str(), track_vars_array);
+
+    php_register_variable("CONTENT_LENGTH", std::to_string(req->body.size()).c_str(), track_vars_array);
+
+    std::string content_type = req->getHeader("Content-Type");
+    if (content_type.empty() && req->method == HttpMethod::POST) {
+        content_type = "application/x-www-form-urlencoded";
+    }
     if (!content_type.empty()) {
         php_register_variable("CONTENT_TYPE", content_type.c_str(), track_vars_array);
     }
 
-    if (tl_req->headers) {
-        tl_req->headers->forEach([&](const std::string &header, const std::string &value) {
-            std::string var_name = header;
-            std::ranges::replace(var_name, '-', '_');
-            std::ranges::transform(var_name, var_name.begin(), ::toupper);
-            var_name = "HTTP_" + var_name;
-            php_register_variable(var_name.c_str(), value.c_str(), track_vars_array);
-        });
+    for (const auto &[header, value] : req->headers) {
+        std::string var_name = header;
+        for (auto& c : var_name) {
+            if (c == '-') c = '_';
+            c = std::toupper(c);
+        }
+        var_name = "HTTP_" + var_name;
+        php_register_variable(var_name.c_str(), value.c_str(), track_vars_array);
+    }
+
+    if (!req->clientIP.empty()) {
+        php_register_variable("REMOTE_ADDR", req->clientIP.c_str(), track_vars_array);
+    }
+
+    if (req->method == HttpMethod::POST && !req->body.empty()) {
+        read_post_offset = 0;
+
+        if (PG(enable_post_data_reading) && !SG(post_read)) {
+            SG(post_read) = 0;
+        }
     }
 }
 
-static int php_embed_send_headers(sapi_headers_struct *sapi_headers) {
+static int wbsrv_php_send_headers(sapi_headers_struct *sapi_headers) {
     return SAPI_HEADER_SENT_SUCCESSFULLY;
 }
 
-void php_embed_sapi_error(int type, const char *error_msg, ...) {
-    std::cout << "PHP Error: " << error_msg << "\n";
+void wbsrv_php_sapi_error(int type, const char *error_msg, ...) {
+    std::cout << "PHP Error: " << error_msg << std::endl;
 }
 
-static char *php_embed_sapi_getenv(const char *name, size_t name_len) {
-    char buffer[256];
-    if (name_len >= sizeof(buffer)) {
-        // name too long
-        return NULL;
-    }
-    memcpy(buffer, name, name_len);
-    buffer[name_len] = '\0';
-
-    // Print the name for debugging
-    printf("Requested env var: %s\n", buffer);
-
-    // Get environment variable value
-    char *value = getenv(buffer);
-    if (value) {
-        // Return a duplicated string because getenv memory shouldn't be modified or freed
-        return strdup(value);
-    } else {
-        return NULL;
-    }
+static char *wbsrv_php_sapi_getenv(const char *name, size_t name_len) {
+    if (!name) return nullptr;
+    const char *env_value = getenv(name);
+    return env_value ? estrdup(env_value) : nullptr;
 }
 
-static char* php_embed_read_cookies() {
-    if (!tl_req || !tl_req->headers->exists("Cookie")) {
-        return "";
+static char *wbsrv_php_read_cookies() {
+    if (!tl_context || !tl_context->request || !tl_context->request->hasHeader("Cookie")) {
+        return nullptr;
     }
 
-    std::string cookie_header = tl_req->getHeader("Cookie");
-
+    std::string cookie_header = tl_context->request->getHeader("Cookie");
     if (cookie_header.empty()) {
-        return "";
+        return nullptr;
     }
 
     return estrdup(cookie_header.c_str());
 }
 
 SAPI_API sapi_module_struct php_embed_module = {
-    "PHP Extension", /* name */
-    "PHP Extension for WBSRV", /* pretty name */
+    "PHP Extension v2", /* name */
+    "PHP Extension for WBSRV v2.0", /* pretty name */
 
-    php_embed_startup, /* startup */
+    wbsrv_php_startup, /* startup */
     php_module_shutdown_wrapper, /* shutdown */
 
     nullptr, /* activate */
-    php_embed_deactivate, /* deactivate */
+    wbsrv_php_deactivate, /* deactivate */
 
-    php_embed_ub_write, /* unbuffered write */
+    wbsrv_php_ub_write, /* unbuffered write */
     nullptr, /* flush */
     nullptr, /* get uid */
-    php_embed_sapi_getenv, /* getenv */
+    wbsrv_php_sapi_getenv, /* getenv */
 
-    php_embed_sapi_error, /* error handler */
+    wbsrv_php_sapi_error, /* error handler */
 
-    php_embed_header_handler, /* header handler */
-    php_embed_send_headers, /* send headers handler */
+    wbsrv_php_header_handler, /* header handler */
+    wbsrv_php_send_headers, /* send headers handler */
     nullptr, /* send header handler */
 
-    php_embed_read_post, /* read POST data */
-    php_embed_read_cookies, /* read Cookies */
+    wbsrv_php_read_post, /* read POST data */
+    wbsrv_php_read_cookies, /* read Cookies */
 
-    php_register_variables, /* register server variables */
+    wbsrv_php_register_variables, /* register server variables */
     nullptr, /* Log message */
     nullptr, /* Get request time */
     nullptr, /* Child terminate */
@@ -291,16 +287,14 @@ public:
 };
 
 class PHPExtension : public IPlugin {
+private:
+    bool initialized_ = false;
+    ConfigValue config_;
+    std::vector<std::string> php_extensions_;
 public:
-    [[nodiscard]] std::string getName() const override {
-        return "PHP Extension";
-    }
+    bool initialize(const ConfigValue &config) override {
+        config_ = config;
 
-    [[nodiscard]] std::string getVersion() const override {
-        return "1.0.0";
-    }
-
-    bool initialize() override {
         php_tsrm_startup();
         zend_signal_startup();
         sapi_startup(&php_embed_module);
@@ -309,118 +303,205 @@ public:
             return false;
         }
 
-        SG(options) |= SAPI_OPTION_NO_CHDIR;
         PG(file_uploads) = 1;
         PG(enable_post_data_reading) = 1;
+        PG(auto_globals_jit) = 0; // Disable JIT for more predictable behavior
 
-        std::cout << "[PHP Extension] Initialized.\n";
+        initialized_ = true;
         return true;
     }
 
     void shutdown() override {
-        std::cout << "[PHP Extension] Shutdown.\n";
+        if (initialized_) {
+            php_embed_module.shutdown(&php_embed_module);
+            sapi_shutdown();
+            tsrm_shutdown();
+            initialized_ = false;
+        }
     }
 
-    HttpResponse handleRequest(HttpRequest *request) override {
+    std::string getName() const override {
+        return "PHP Extension";
+    }
+
+    std::string getVersion() const override {
+        return "2.0.0";
+    }
+
+    std::string getDescription() const override {
+        return "PHP script execution engine for WBSRV";
+    }
+
+    void registerHooks(HookManager &hookManager) override {
+        hookManager.registerHook(HookType::PRE_REQUEST, getName(),
+            [this](RequestContext &context) -> bool {
+                return handlePreRequest(context);
+            }, 50);
+    }
+
+    bool validateConfig(const ConfigValue &config) const override {
+        if (config.hasKey("document_root") && !config["document_root"].isString()) {
+            return false;
+        }
+        return true;
+    }
+
+    std::vector<std::string> getDependencies() const override {
+        return {}; // No dependencies
+    }
+
+    std::vector<std::string> getProvides() const override {
+        return {"php", "scripting"};
+    }
+
+private:
+    bool handlePreRequest(RequestContext &context) {
+        if (context.request->path.compare(context.request->path.length() - 4, 4, ".php") != 0)
+            return true; // Continue processing
+
+        tl_context = &context;
+        read_post_offset = 0;
+        tl_headers_to_send.clear();
+
+        bool success = executePhpScript(context);
+
+        tl_context = nullptr;
+
+        return success;
+    }
+
+    bool executePhpScript(RequestContext &context) {
+        tl_context = &context;
+        read_post_offset = 0;
+        tl_headers_to_send.clear();
+
+        if (!initialized_) {
+            context.response->setStatus(500, "Internal Server Error");
+            context.response->body = "PHP Extension not initialized";
+            context.response->setTextContent();
+            return false;
+        }
+
         ts_resource(0);
-        HttpResponse response;
-        response.statusCode = 200;
-        response.headers["Content-Type"] = "text/html";
-        response.handled = true;
-
-        tl_req = request;
-
         OutputCapture capture;
-        std::string full_path = request->web_root + request->path;
+
+        std::string full_path = context.getMetadata("document_root").asString() + context.request->path;
 
         try {
+            // FIX 5: More explicit server context setup
             SG(server_context) = (void *)1;
-
             SG(sapi_headers).http_response_code = 200;
-            SG(request_info).request_method = methodToString(request->method).c_str();
-            SG(request_info).request_uri = strdup(request->path.c_str());
-            SG(request_info).query_string = strdup(request->query.c_str());
-            SG(request_info).content_length = request->body->size();
-            SG(request_info).content_type = request->headers->get("Content-Type").empty() ? "" : estrdup(request->headers->get("Content-Type").c_str());
+            SG(request_info).request_method = estrdup(httpMethodToString(context.request->method).c_str());
+            SG(request_info).request_uri = estrdup(context.request->path.c_str());
+            SG(request_info).query_string = estrdup(context.request->query.c_str());
+
+            // FIX 6: Explicitly set content length and ensure it's available
+            SG(request_info).content_length = static_cast<long>(context.request->body.size());
+
+            std::string content_type = context.request->getHeader("Content-Type");
+            if (content_type.empty() && context.request->method == HttpMethod::POST && !context.request->body.empty()) {
+                content_type = "application/x-www-form-urlencoded";
+            }
+            if (!content_type.empty()) {
+                SG(request_info).content_type = estrdup(content_type.c_str());
+            }
+
             SG(request_info).path_translated = estrdup(full_path.c_str());
             SG(request_info).proto_num = 2000;
 
-            if (php_request_startup() == FAILURE) {
-                std::cout << "php_request_startup() failed\n";
-                response.statusCode = 500;
-                response.body = "PHP request startup failed";
-                response.headers["Content-Type"] = "text/plain";
-                return response;
+            SG(post_read) = 0;
+
+            if (access(full_path.c_str(), R_OK) != 0) {
+                context.response->setStatus(404, "Not Found");
+                context.response->body = "File not found: " + context.request->path;
+                context.response->setTextContent();
+                return false;
             }
+
+            if (php_request_startup() == FAILURE) {
+                context.response->setStatus(500, "Internal Server Error");
+                context.response->body = "PHP request startup failed";
+                context.response->setTextContent();
+                return false;
+            }
+
+            if (context.request->method == HttpMethod::POST && !context.request->body.empty())
+                read_post_offset = 0;
 
             zend_file_handle file_handle;
             zend_stream_init_filename(&file_handle, full_path.c_str());
 
-            zend_try
-                {
-                    CG(skip_shebang) = true;
-                    php_execute_script(&file_handle);
-                    response.body = capture.getOutput();
+            zend_try {
+                CG(skip_shebang) = true;
+                php_execute_script(&file_handle);
+
+                context.response->body = capture.getOutput();
+                context.response->headers = tl_headers_to_send;
+
+                if (context.response->headers.find("Content-Type") == context.response->headers.end()) {
+                    context.response->setHeader("Content-Type", "text/html; charset=UTF-8");
                 }
+
+                context.response->statusCode = SG(sapi_headers).http_response_code;
+            }
             zend_catch {
-                    zend_destroy_file_handle(&file_handle);
-                    response.statusCode = 500;
-                    response.body = "PHP execution failed";
+                zend_destroy_file_handle(&file_handle);
+                context.response->setStatus(500, "Internal Server Error");
+                context.response->body = "PHP execution failed";
 
-                    // Include any output that was generated before the error
-                    std::string error_output = capture.getOutput();
-                    if (!error_output.empty()) {
-                        response.body += "\nOutput before error: " + error_output;
-                    }
-
-                    response.headers["Content-Type"] = "text/plain";
-                    php_request_shutdown(nullptr);
-                    return response;
+                std::string error_output = capture.getOutput();
+                if (!error_output.empty()) {
+                    context.response->body += "\nOutput before error: " + error_output;
                 }
+
+                context.response->setTextContent();
+                php_request_shutdown(nullptr);
+                return false;
+            }
             zend_end_try();
 
             zend_destroy_file_handle(&file_handle);
             php_request_shutdown(nullptr);
+
+            return true;
+
         } catch (const std::exception &e) {
-            response.statusCode = 500;
-            response.body = "Exception: " + std::string(e.what());
+            context.response->setStatus(500, "Internal Server Error");
+            context.response->body = "Exception: " + std::string(e.what());
 
             std::string error_output = capture.getOutput();
             if (!error_output.empty()) {
-                response.body += "\nOutput before exception: " + error_output;
+                context.response->body += "\nOutput before exception: " + error_output;
             }
 
-            response.headers["Content-Type"] = "text/plain";
-        }
-        return response;
-    }
-
-private:
-    [[nodiscard]] static std::string methodToString(HttpMethod method) {
-        switch (method) {
-            case HttpMethod::GET: return "GET";
-            case HttpMethod::POST: return "POST";
-            case HttpMethod::OPTIONS: return "OPTIONS";
-            case HttpMethod::DELETE: return "DELETE";
-            case HttpMethod::HEAD: return "HEAD";
-            case HttpMethod::CONNECT: return "CONNECT";
-            case HttpMethod::CONNECT_UDP: return "CONNECT_UDP";
-            case HttpMethod::PUT: return "PUT";
-            case HttpMethod::TRACE: return "TRACE";
-            case HttpMethod::PATCH: return "PATCH";
-            case HttpMethod::SUB: return "SUB";
-            case HttpMethod::PUB: return "PUB";
-            case HttpMethod::UNSUB: return "UNSUB";
-            default: return "UNKNOWN";
+            context.response->setTextContent();
+            return false;
         }
     }
 };
 
-// Plugin factory functions
-extern "C" IPlugin *createPlugin() {
-    return new PHPExtension();
-}
+extern "C" {
+    IPlugin *createPlugin() {
+        return new PHPExtension();
+    }
 
-extern "C" void destroyPlugin(IPlugin *plugin) {
-    delete plugin;
+    void destroyPlugin(IPlugin *plugin) {
+        delete plugin;
+    }
+
+    const char *getPluginName() {
+        return "PHP Extension";
+    }
+
+    const char *getPluginVersion() {
+        return "2.0.0";
+    }
+
+    const char *getPluginDescription() {
+        return "PHP script execution engine for WBSRV";
+    }
+
+    int getPluginAPIVersion() {
+        return 1;
+    }
 }

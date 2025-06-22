@@ -4,6 +4,8 @@
 #include <folly/io/IOBufQueue.h>
 
 #include "interface.h"
+#include "ext/plugin_loader.h"
+#include "../include/interface.h"
 
 class StaticHandler : public proxygen::RequestHandler {
 public:
@@ -32,7 +34,7 @@ private:
     bool checkForCompletion();
     void processRequest();
 
-    void handlePHPRequest(HttpMethod method, const std::string &query) const;
+    void handlePHPRequest(PluginManager::HttpMethod method, const std::string &query) const;
     void handleStaticFile();
 
     std::string cached_content_type_;
@@ -49,3 +51,7 @@ private:
     bool error_ = false;
     folly::EventBase *event_base_;
 };
+
+// Global declarations
+extern PluginManager::HookManagerImpl* plugin_loader;
+extern PluginManager::PluginManager* plugin_manager;

@@ -17,7 +17,7 @@ endif ()
 
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -fpermissive")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+set(CMAKE_CXX_FLAGS_RELEASE "-Ofast")
 
 # VCPKG settings
 set(VCPKG_TARGET_ARCHITECTURE x64)

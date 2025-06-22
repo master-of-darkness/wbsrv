@@ -5,8 +5,48 @@
 #include "utils/defines.h"
 #include "utils/utils.h"
 #include "ext/plugin_loader.h"
+#include "../include/interface.h"
 
 using namespace proxygen;
+
+std::unordered_map<std::string, std::string> convertHeaders(const proxygen::HTTPHeaders& headers) {
+    std::unordered_map<std::string, std::string> result;
+    headers.forEach([&result](const std::string& name, const std::string& value) {
+        result[name] = value;
+    });
+    return result;
+}
+
+std::string convertBodyToString(const std::unique_ptr<folly::IOBuf>& body) {
+    if (!body) return "";
+
+    std::string result;
+    result.reserve(body->computeChainDataLength());
+
+    for (const auto& buf : *body) {
+        result.append(reinterpret_cast<const char*>(buf.data()), buf.size());
+    }
+
+    return result;
+}
+
+std::string getClientIP(const std::unique_ptr<HTTPMessage>& headers) {
+    auto clientIP = headers->getHeaders().getSingleOrEmpty("X-Forwarded-For");
+    if (!clientIP.empty()) {
+        auto commaPos = clientIP.find(',');
+        if (commaPos != std::string::npos) {
+            clientIP = clientIP.substr(0, commaPos);
+        }
+        return clientIP;
+    }
+
+    clientIP = headers->getHeaders().getSingleOrEmpty("X-Real-IP");
+    if (!clientIP.empty()) {
+        return clientIP;
+    }
+
+    return "127.0.0.1"; // Default for now
+}
 
 void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> message) noexcept {
     error_ = false;
@@ -14,8 +54,11 @@ void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> message) noexcept {
 
     auto cache_acc = utils::cache.get(path_);
 
+    const size_t len = path_.size();
+    bool is_php = len >= 4 && path_.compare(len - 4, 4, ".php") == 0;
+
     // Check if the path is already cached
-    if (cache_acc && headers_->getMethod() == HTTPMethod::GET) {
+    if (cache_acc && headers_->getMethod() == HTTPMethod::GET && !is_php) {
         const auto &cache_row = *cache_acc;
         if (cache_row.time_to_die <= std::chrono::steady_clock::now()) {
             utils::cache.remove(path_);
@@ -39,7 +82,7 @@ void StaticHandler::processRequest() {
     auto method_opt = headers_->getMethod();
     if (!method_opt.has_value()) return;
 
-    HttpMethod method = static_cast<HttpMethod>(method_opt.value());
+    PluginManager::HttpMethod method = PluginManager::ProxygenBridge::convertMethod(method_opt.value());
     std::string query = headers_->getQueryString();
 
     const size_t len = path_.size();
@@ -54,25 +97,63 @@ void StaticHandler::processRequest() {
     });
 }
 
-void StaticHandler::handlePHPRequest(HttpMethod method, const std::string& query) const {
-    HttpRequest req(
-        method, headers_->getPath(), query,
-        std::make_unique<ProxygenHeadersAdapter>(headers_->getHeaders()),
-        std::make_unique<FollyBodyImpl>(body_ ? body_->clone() : folly::IOBuf::create(0)),
-        web_root_
-    );
+void StaticHandler::handlePHPRequest(PluginManager::HttpMethod method, const std::string& query) const {
+    // Create the HttpRequest according to the interface
+    PluginManager::HttpRequest request;
+    request.method = method;
+    request.path = headers_->getPath();
+    request.query = query;
+    request.headers = convertHeaders(headers_->getHeaders());
+    request.body = convertBodyToString(body_);
+    request.clientIP = getClientIP(headers_);
 
-    auto response = plugin_loader->routeRequest(&req);
-    if (!response.handled) return;
+    // Create HttpResponse
+    PluginManager::HttpResponse response;
 
-    event_base_->runInEventBaseThread([this, response = std::move(response)]() {
+    // Create RequestContext
+    PluginManager::RequestContext context;
+    context.request = &request;
+    context.response = &response;
+    context.requestId = reinterpret_cast<uint64_t>(this); // Use handler address as unique ID
+    context.startTime = std::chrono::steady_clock::now();
+
+    context.setMetadata("document_root", web_root_);
+
+    bool handled = false;
+    if (plugin_loader) {
+        if (plugin_loader->executeHooks(PluginManager::HookType::PRE_REQUEST, context)) {
+            if (plugin_loader->executeHooks(PluginManager::HookType::POST_REQUEST, context)) {
+                plugin_loader->executeHooks(PluginManager::HookType::PRE_RESPONSE, context);
+                handled = true;
+            }
+        }
+    }
+
+    if (!handled) {
+        response.setStatus(404, "Not Found");
+        response.setTextContent();
+        response.body = utils::getErrorPage(404);
+    }
+
+    event_base_->runInEventBaseThread([this, response = std::move(response), context]() {
         if (error_ || finished_) return;
 
-        ResponseBuilder(downstream_)
-            .status(response.statusCode, "Extension return")
-            .header("Content-Type", response.headers.at("Content-Type"))
-            .body(response.body)
-            .sendWithEOM();
+        auto rb = ResponseBuilder(downstream_);
+        rb.status(response.statusCode, response.statusMessage);
+
+        for (const auto& header : response.headers) {
+            rb.header(header.first, header.second);
+        }
+
+        rb.body(response.body);
+        rb.sendWithEOM();
+
+        if (plugin_loader) {
+            auto asyncContext = context;
+            folly::getUnsafeMutableGlobalCPUExecutor()->add([this, asyncContext]() mutable {
+                plugin_loader->executeHooks(PluginManager::HookType::POST_RESPONSE, asyncContext);
+            });
+        }
     });
 }
 
@@ -171,7 +252,6 @@ void StaticHandler::onEgressPaused() noexcept {
 
 void StaticHandler::onEgressResumed() noexcept {
     paused_ = false;
-    // If readFileScheduled_, it will reschedule itself
     if (!readFileScheduled_ && file_ && !error_ && !finished_) {
         readFileScheduled_ = true;
         folly::getUnsafeMutableGlobalCPUExecutor()->add([this]() {

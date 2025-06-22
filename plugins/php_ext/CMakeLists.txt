@@ -33,7 +33,6 @@ endif()
 add_library(php_plugin SHARED
         ${CMAKE_SOURCE_DIR}/include/interface.h
         ${CMAKE_SOURCE_DIR}/plugins/php_ext/php_ext.cpp
-        ${CMAKE_SOURCE_DIR}/plugins/php_ext/php_ext.h
 )
 
 target_include_directories(php_plugin PRIVATE

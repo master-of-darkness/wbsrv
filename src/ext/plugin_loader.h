@@ -1,197 +1,496 @@
 #pragma once
-#include <filesystem>
-#include "../include/interface.h"
-#include "utils/concurrent_cache.h"
+#include <proxygen/httpserver/HTTPServer.h>
+#include <folly/Memory.h>
+#include <folly/json.h>
+#include <folly/dynamic.h>
+#include <glog/logging.h>
+
+#include <memory>
+#include <vector>
+#include <unordered_map>
+#include <string>
 #include <dlfcn.h>
-#include "proxygen/httpserver/HTTPServer.h"
-#define LIBRARY_HANDLE void*
-#define LOAD_LIBRARY(path) dlopen(path, RTLD_LAZY)
-#define GET_FUNCTION(handle, name) dlsym(handle, name)
-#define CLOSE_LIBRARY(handle) dlclose(handle)
-#define LIBRARY_EXTENSION ".so"
+#include <filesystem>
+#include <shared_mutex>
+#include <atomic>
+#include <thread>
+#include <algorithm>
+#include <proxygen/httpserver/ResponseBuilder.h>
 
+#include "../include/interface.h"
 
-struct PluginInfo {
-    std::string name;
-    std::string version;
-    std::string filePath;
-    LIBRARY_HANDLE handle;
-    IPlugin *instance;
-    CreatePluginFunc createFunc;
-    DestroyPluginFunc destroyFunc;
-    std::atomic<bool> isLoaded{false};
-    std::atomic<bool> isInitialized{false};
-
-    PluginInfo() = default;
-
-    PluginInfo(const PluginInfo &) = delete;
-
-    PluginInfo &operator=(const PluginInfo &) = delete;
-
-    PluginInfo(PluginInfo &&other) noexcept
-        : name(std::move(other.name))
-          , version(std::move(other.version))
-          , filePath(std::move(other.filePath))
-          , handle(other.handle)
-          , instance(other.instance)
-          , createFunc(other.createFunc)
-          , destroyFunc(other.destroyFunc)
-          , isLoaded(other.isLoaded.load())
-          , isInitialized(other.isInitialized.load()) {
-        other.handle = nullptr;
-        other.instance = nullptr;
-        other.createFunc = nullptr;
-        other.destroyFunc = nullptr;
-    }
-
-    PluginInfo &operator=(PluginInfo &&other) noexcept {
-        if (this != &other) {
-            name = std::move(other.name);
-            version = std::move(other.version);
-            filePath = std::move(other.filePath);
-            handle = other.handle;
-            instance = other.instance;
-            createFunc = other.createFunc;
-            destroyFunc = other.destroyFunc;
-            isLoaded.store(other.isLoaded.load());
-            isInitialized.store(other.isInitialized.load());
-
-            other.handle = nullptr;
-            other.instance = nullptr;
-            other.createFunc = nullptr;
-            other.destroyFunc = nullptr;
+namespace PluginManager {
+    class ProxygenBridge {
+    public:
+        static HttpMethod convertMethod(proxygen::HTTPMethod method) {
+            switch (method) {
+                case proxygen::HTTPMethod::GET: return HttpMethod::GET;
+                case proxygen::HTTPMethod::POST: return HttpMethod::POST;
+                case proxygen::HTTPMethod::PUT: return HttpMethod::PUT;
+                case proxygen::HTTPMethod::DELETE: return HttpMethod::DELETE;
+                case proxygen::HTTPMethod::HEAD: return HttpMethod::HEAD;
+                case proxygen::HTTPMethod::OPTIONS: return HttpMethod::OPTIONS;
+                case proxygen::HTTPMethod::PATCH: return HttpMethod::PATCH;
+                case proxygen::HTTPMethod::CONNECT: return HttpMethod::CONNECT;
+                case proxygen::HTTPMethod::TRACE: return HttpMethod::TRACE;
+                default: return HttpMethod::UNKNOWN;
+            }
         }
-        return *this;
-    }
-};
 
-class PluginLoader {
-public:
-    PluginLoader();
+        static HttpRequest convertRequest(const proxygen::HTTPMessage &msg, const std::string &body = "") {
+            HttpRequest req;
+            req.method = convertMethod(msg.getMethod().value());
+            req.path = msg.getPath();
+            req.query = msg.getQueryString();
+            req.body = body;
+            req.clientIP = msg.getClientIP().c_str();
 
-    ~PluginLoader();
+            // Convert headers
+            msg.getHeaders().forEach([&req](const std::string &name, const std::string &value) {
+                req.headers[name] = value;
+            });
 
-    bool loadPlugin(const std::string &filePath);
+            return req;
+        }
 
-    bool unloadPlugin(const std::string &pluginName);
+        static void applyResponse(const HttpResponse &response, proxygen::ResponseBuilder &builder) {
+            builder.status(response.statusCode, response.statusMessage);
 
-    void unloadAllPlugins();
+            for (const auto &[name, value]: response.headers) {
+                builder.header(name, value);
+            }
 
-    bool loadPluginsFromDirectory(const std::string &directory);
+            if (!response.body.empty()) {
+                builder.body(response.body);
+            }
+        }
 
-    bool initializePlugin(const std::string &pluginName);
+        static ConfigValue convertFromFolly(const folly::dynamic &d) {
+            if (d.isString()) {
+                return ConfigValue(d.asString());
+            } else if (d.isInt()) {
+                return ConfigValue(d.asInt());
+            } else if (d.isDouble()) {
+                return ConfigValue(d.asDouble());
+            } else if (d.isBool()) {
+                return ConfigValue(d.asBool());
+            } else if (d.isObject()) {
+                ConfigValue obj;
+                for (const auto &[key, value]: d.items()) {
+                    obj[key.asString()] = convertFromFolly(value);
+                }
+                return obj;
+            }
+            return ConfigValue(); // null
+        }
 
-    bool shutdownPlugin(const std::string &pluginName);
+        static folly::dynamic convertToFolly(const ConfigValue &c) {
+            if (c.isString()) {
+                return folly::dynamic(c.asString());
+            } else if (c.isInt()) {
+                return folly::dynamic(c.asInt());
+            } else if (c.isDouble()) {
+                return folly::dynamic(c.asDouble());
+            } else if (c.isBool()) {
+                return folly::dynamic(c.asBool());
+            }
+            return folly::dynamic(); // null
+        }
+    };
 
-    void initializeAllPlugins();
+    // Logger implementation using glog
+    class GlogLogger : public ILogger {
+    public:
+        void info(const std::string &message) override {
+            LOG(INFO) << message;
+        }
 
-    void shutdownAllPlugins();
+        void warning(const std::string &message) override {
+            LOG(WARNING) << message;
+        }
 
-    IPlugin *getPlugin(const std::string &pluginName);
+        void error(const std::string &message) override {
+            LOG(ERROR) << message;
+        }
 
-    HttpResponse routeRequest(HttpRequest *request);
+        void debug(const std::string &message) override {
+            VLOG(1) << message;
+        }
+    };
 
-    static std::string getLastError();
+    // Hook registration info
+    struct HookInfo {
+        std::string pluginName;
+        HookFunction function;
+        int priority{100}; // Lower numbers = higher priority
+        bool enabled{true};
+    };
 
-    static void clearLastError();
+    // Concrete Hook Manager implementation
+    class HookManagerImpl : public HookManager {
+    private:
+        std::unordered_map<HookType, std::vector<HookInfo> > hooks_;
+        mutable std::shared_mutex hooksMutex_;
 
-private:
-    utils::ConcurrentLRUCache<std::string, PluginInfo> plugins_{1000};
+    public:
+        void registerHook(HookType type, const std::string &pluginName,
+                          HookFunction func, int priority = 100) override {
+            std::unique_lock lock(hooksMutex_);
 
-    utils::ConcurrentLRUCache<std::string, IPlugin *> pluginInstanceCache_{1000};
-    utils::ConcurrentLRUCache<std::string, std::string> routeToPluginCache_{5000};
+            HookInfo info;
+            info.pluginName = pluginName;
+            info.function = std::move(func);
+            info.priority = priority;
 
-    std::atomic<size_t> loadedPluginCount_{0};
-    std::atomic<size_t> initializedPluginCount_{0};
+            hooks_[type].push_back(std::move(info));
 
-    thread_local static std::string lastError_;
+            // Sort by priority (lower number = higher priority)
+            std::sort(hooks_[type].begin(), hooks_[type].end(),
+                      [](const HookInfo &a, const HookInfo &b) {
+                          return a.priority < b.priority;
+                      });
+        }
 
-    void scanDirectory(const std::string &directory, std::vector<std::string> &pluginFiles) const;
+        void unregisterHooks(const std::string &pluginName) {
+            std::unique_lock lock(hooksMutex_);
 
-    static bool loadLibrary(const std::string &filePath, LIBRARY_HANDLE&handle);
+            for (auto &[type, hookList]: hooks_) {
+                hookList.erase(
+                    std::remove_if(hookList.begin(), hookList.end(),
+                                   [&pluginName](const HookInfo &info) {
+                                       return info.pluginName == pluginName;
+                                   }),
+                    hookList.end());
+            }
+        }
 
-    static bool getFunctionPointers(LIBRARY_HANDLE handle, CreatePluginFunc &createFunc,
-                                    DestroyPluginFunc &destroyFunc);
+        bool executeHooks(HookType type, RequestContext &context) {
+            std::shared_lock lock(hooksMutex_);
 
-    static bool isValidPluginFile(const std::string &filePath);
+            auto it = hooks_.find(type);
+            if (it == hooks_.end()) {
+                return true; // No hooks registered, continue
+            }
 
-    static std::string getSystemError();
+            for (const auto &hookInfo: it->second) {
+                if (!hookInfo.enabled) continue;
 
-    static void setLastError(const std::string &error);
+                try {
+                    if (!hookInfo.function(context)) {
+                        // Hook returned false, stop processing
+                        return false;
+                    }
+                } catch (const std::exception &e) {
+                    VLOG(1) << "Hook execution failed for plugin "
+                        << hookInfo.pluginName << ": " << e.what();
+                    // Continue with other hooks on error
+                }
+            }
 
-    void updatePluginCache(const std::string &pluginName, IPlugin *plugin);
+            return true;
+        }
 
-    void invalidatePluginCache(const std::string &pluginName);
+        void enableHook(const std::string &pluginName, bool enabled) override {
+            std::unique_lock lock(hooksMutex_);
 
-    void invalidateRouteCache();
+            for (auto &[type, hookList]: hooks_) {
+                for (auto &hookInfo: hookList) {
+                    if (hookInfo.pluginName == pluginName) {
+                        hookInfo.enabled = enabled;
+                    }
+                }
+            }
+        }
 
-    PluginInfo createPluginInfo(const std::string &filePath,
-                                LIBRARY_HANDLE handle,
-                                CreatePluginFunc createFunc,
-                                DestroyPluginFunc destroyFunc);
-};
+        // Additional methods for server management
+        std::vector<std::string> getHookPlugins(HookType type) const {
+            std::shared_lock lock(hooksMutex_);
+            std::vector<std::string> plugins;
 
-inline std::unique_ptr<PluginLoader> plugin_loader = std::make_unique<PluginLoader>();
+            auto it = hooks_.find(type);
+            if (it != hooks_.end()) {
+                for (const auto &hookInfo: it->second) {
+                    plugins.push_back(hookInfo.pluginName);
+                }
+            }
 
-class ProxygenHeadersAdapter : public IHeaders {
-private:
-    const proxygen::HTTPHeaders &headers_;
+            return plugins;
+        }
 
-public:
-    ProxygenHeadersAdapter(const proxygen::HTTPHeaders &headers) : headers_(headers) {
-    }
+        size_t getHookCount(HookType type) const {
+            std::shared_lock lock(hooksMutex_);
+            auto it = hooks_.find(type);
+            return (it != hooks_.end()) ? it->second.size() : 0;
+        }
+    };
 
-    std::string get(const std::string &name) const override {
-        return headers_.getSingleOrEmpty(name);
-    }
+    // Plugin Manager - handles loading/unloading plugins
+    class PluginManager {
+    private:
+        struct LoadedPlugin {
+            std::unique_ptr<IPlugin> plugin;
+            void *handle{nullptr};
+            std::string path;
+            ConfigValue config;
+            std::vector<std::string> dependencies;
+            PluginContext context;
+        };
 
-    bool exists(const std::string &name) const override {
-        return headers_.exists(name);
-    }
+        std::unordered_map<std::string, LoadedPlugin> loadedPlugins_;
+        HookManagerImpl &hookManager_;
+        GlogLogger logger_;
+        mutable std::shared_mutex pluginsMutex_;
 
-    std::vector<std::string> getAll(const std::string &name) const override {
-        std::vector<std::string> values;
-        headers_.forEachValueOfHeader(name, [&](const std::string &value) {
-            values.push_back(value);
-            return false;
-        });
-        return values;
-    }
+    public:
+        explicit PluginManager(HookManagerImpl &hookManager)
+            : hookManager_(hookManager) {
+        }
 
-    void forEach(std::function<void(const std::string &, const std::string &)> callback) const override {
-        headers_.forEach(callback);
-    }
+        ~PluginManager() {
+            unloadAllPlugins();
+        }
 
-    size_t size() const override {
-        return headers_.size();
-    }
-};
+        bool loadPlugin(const std::string &path, const folly::dynamic &config = folly::dynamic::object()) {
+            std::unique_lock lock(pluginsMutex_);
 
-class FollyBodyImpl : public IBody {
-private:
-    std::unique_ptr<folly::IOBuf> iobuf_;
+            void *handle = dlopen(path.c_str(), RTLD_LAZY);
+            if (!handle) {
+                LOG(ERROR) << "Cannot load plugin " << path << ": " << dlerror();
+                return false;
+            }
 
-public:
-    explicit FollyBodyImpl(std::unique_ptr<folly::IOBuf> iobuf)
-        : iobuf_(std::move(iobuf)) {}
+            // Get the create function
+            typedef IPlugin * (*create_plugin_t)();
+            create_plugin_t createPlugin = (create_plugin_t) dlsym(handle, "createPlugin");
 
-    const char* data() const override {
-        return reinterpret_cast<const char*>(iobuf_->data());
-    }
+            if (!createPlugin) {
+                LOG(ERROR) << "Cannot find createPlugin function in " << path;
+                dlclose(handle);
+                return false;
+            }
 
-    size_t size() const override {
-        return iobuf_->length();
-    }
+            // Create plugin instance
+            std::unique_ptr<IPlugin> plugin(createPlugin());
+            if (!plugin) {
+                LOG(ERROR) << "Failed to create plugin instance from " << path;
+                dlclose(handle);
+                return false;
+            }
 
-    bool empty() const override {
-        return !iobuf_ || iobuf_->empty();
-    }
+            std::string pluginName = plugin->getName();
 
-    std::string toString() const override {
-        return iobuf_->toString();
-    }
+            // Check if plugin is already loaded
+            if (loadedPlugins_.find(pluginName) != loadedPlugins_.end()) {
+                LOG(WARNING) << "Plugin " << pluginName << " is already loaded";
+                dlclose(handle);
+                return false;
+            }
 
-    std::string_view view() const override {
-        return std::string_view(data(), size());
-    }
-};
+            // Convert config
+            ConfigValue pluginConfig = ProxygenBridge::convertFromFolly(config);
+
+            // Validate configuration
+            if (!plugin->validateConfig(pluginConfig)) {
+                LOG(ERROR) << "Invalid configuration for plugin " << pluginName;
+                dlclose(handle);
+                return false;
+            }
+
+            // Check dependencies
+            auto dependencies = plugin->getDependencies();
+            for (const auto &dep: dependencies) {
+                if (loadedPlugins_.find(dep) == loadedPlugins_.end()) {
+                    LOG(ERROR) << "Plugin " << pluginName << " depends on " << dep
+                            << " which is not loaded";
+                    dlclose(handle);
+                    return false;
+                }
+            }
+
+            // Setup plugin context
+            PluginContext context;
+            context.hookManager = &hookManager_;
+            context.logger = &logger_;
+            context.config = pluginConfig;
+
+            // Initialize plugin
+            if (!plugin->initialize(pluginConfig)) {
+                LOG(ERROR) << "Failed to initialize plugin " << pluginName;
+                dlclose(handle);
+                return false;
+            }
+
+            // Register hooks
+            plugin->registerHooks(hookManager_);
+
+            // Store loaded plugin
+            LoadedPlugin loadedPlugin;
+            loadedPlugin.plugin = std::move(plugin);
+            loadedPlugin.handle = handle;
+            loadedPlugin.path = path;
+            loadedPlugin.config = pluginConfig;
+            loadedPlugin.dependencies = dependencies;
+            loadedPlugin.context = std::move(context);
+
+            loadedPlugins_[pluginName] = std::move(loadedPlugin);
+
+            LOG(INFO) << "Successfully loaded plugin: " << pluginName
+                    << " v" << loadedPlugins_[pluginName].plugin->getVersion();
+            return true;
+        }
+
+        bool unloadPlugin(const std::string &name) {
+            std::unique_lock lock(pluginsMutex_);
+
+            auto it = loadedPlugins_.find(name);
+            if (it == loadedPlugins_.end()) {
+                return false;
+            }
+
+            // Check if other plugins depend on this one
+            for (const auto &[pluginName, loadedPlugin]: loadedPlugins_) {
+                if (pluginName != name) {
+                    auto &deps = loadedPlugin.dependencies;
+                    if (std::find(deps.begin(), deps.end(), name) != deps.end()) {
+                        LOG(ERROR) << "Cannot unload plugin " << name
+                                << " because " << pluginName << " depends on it";
+                        return false;
+                    }
+                }
+            }
+
+            // Unregister hooks
+            hookManager_.unregisterHooks(name);
+
+            // Shutdown plugin
+            it->second.plugin->shutdown();
+
+            // Close library
+            if (it->second.handle) {
+                dlclose(it->second.handle);
+            }
+
+            loadedPlugins_.erase(it);
+            LOG(INFO) << "Unloaded plugin: " << name;
+            return true;
+        }
+
+        void unloadAllPlugins() {
+            std::unique_lock lock(pluginsMutex_);
+
+            // Unload in reverse dependency order
+            std::vector<std::string> toUnload;
+            for (const auto &[name, _]: loadedPlugins_) {
+                toUnload.push_back(name);
+            }
+
+            // Simple approach: keep trying to unload until all are gone
+            while (!toUnload.empty()) {
+                size_t initialSize = toUnload.size();
+
+                for (auto it = toUnload.begin(); it != toUnload.end();) {
+                    const std::string &name = *it;
+                    auto pluginIt = loadedPlugins_.find(name);
+
+                    if (pluginIt != loadedPlugins_.end()) {
+                        // Check dependencies
+                        bool canUnload = true;
+                        for (const auto &[otherName, otherPlugin]: loadedPlugins_) {
+                            if (otherName != name) {
+                                auto &deps = otherPlugin.dependencies;
+                                if (std::find(deps.begin(), deps.end(), name) != deps.end()) {
+                                    canUnload = false;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (canUnload) {
+                            hookManager_.unregisterHooks(name);
+                            pluginIt->second.plugin->shutdown();
+                            if (pluginIt->second.handle) {
+                                dlclose(pluginIt->second.handle);
+                            }
+                            loadedPlugins_.erase(pluginIt);
+                            it = toUnload.erase(it);
+                            continue;
+                        }
+                    }
+                    ++it;
+                }
+
+                // If we couldn't unload anything, break to avoid infinite loop
+                if (toUnload.size() == initialSize) {
+                    LOG(WARNING) << "Could not unload all plugins due to circular dependencies";
+                    break;
+                }
+            }
+
+            loadedPlugins_.clear();
+        }
+
+        bool reloadPlugin(const std::string &name) {
+            std::shared_lock lock(pluginsMutex_);
+
+            auto it = loadedPlugins_.find(name);
+            if (it == loadedPlugins_.end()) {
+                return false;
+            }
+
+            std::string path = it->second.path;
+            folly::dynamic config = ProxygenBridge::convertToFolly(it->second.config);
+
+            lock.unlock();
+
+            return unloadPlugin(name) && loadPlugin(path, config);
+        }
+
+        std::vector<std::string> getLoadedPlugins() const {
+            std::shared_lock lock(pluginsMutex_);
+
+            std::vector<std::string> plugins;
+            plugins.reserve(loadedPlugins_.size());
+
+            for (const auto &[name, _]: loadedPlugins_) {
+                plugins.push_back(name);
+            }
+
+            return plugins;
+        }
+
+        IPlugin *getPlugin(const std::string &name) const {
+            std::shared_lock lock(pluginsMutex_);
+
+            auto it = loadedPlugins_.find(name);
+            return (it != loadedPlugins_.end()) ? it->second.plugin.get() : nullptr;
+        }
+
+        folly::dynamic getPluginInfo(const std::string &name) const {
+            std::shared_lock lock(pluginsMutex_);
+
+            auto it = loadedPlugins_.find(name);
+            if (it == loadedPlugins_.end()) {
+                return folly::dynamic();
+            }
+
+            return folly::dynamic::object
+                    ("name", it->second.plugin->getName())
+                    ("version", it->second.plugin->getVersion())
+                    ("description", it->second.plugin->getDescription())
+                    ("path", it->second.path)
+                    ("dependencies", folly::dynamic(it->second.dependencies.begin(),
+                                                    it->second.dependencies.end()));
+        }
+
+        folly::dynamic getAllPluginsInfo() const {
+            std::shared_lock lock(pluginsMutex_);
+
+            folly::dynamic plugins = folly::dynamic::array();
+            for (const auto &[name, loadedPlugin]: loadedPlugins_) {
+                plugins.push_back(getPluginInfo(name));
+            }
+
+            return plugins;
+        }
+    };
+}

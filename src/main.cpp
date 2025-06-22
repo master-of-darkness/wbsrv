@@ -19,6 +19,9 @@
 
 using namespace proxygen;
 
+PluginManager::HookManagerImpl* plugin_loader = nullptr;
+PluginManager::PluginManager* plugin_manager = nullptr;
+
 class HandlerFactory : public RequestHandlerFactory {
 public:
     void onServerStart(folly::EventBase * /*evb*/) noexcept override {
@@ -83,8 +86,13 @@ int main(int argc, char *argv[]) {
     if (!vhost::load(IPs))
         return -1;
 
-    plugin_loader->loadPluginsFromDirectory("../plugins"); // TODO: make this configurable
-    plugin_loader->initializeAllPlugins();
+    static PluginManager::HookManagerImpl hookManager;
+    static PluginManager::PluginManager pluginMgr(hookManager);
+
+    plugin_loader = &hookManager;
+    plugin_manager = &pluginMgr;
+
+    plugin_manager->loadPlugin("../plugins/php_plugin.so"); // TODO: add field in server.yaml for plugin path
 
     HTTPServerOptions options;
     options.threads = static_cast<size_t>(general_config.threads);
@@ -107,9 +115,9 @@ int main(int argc, char *argv[]) {
 
     t.join();
 
-#ifndef DEBUG
-    exit(EXIT_SUCCESS);
-#endif
+    #ifndef DEBUG
+        exit(EXIT_SUCCESS);
+    #endif
 
     return 0;
 }
