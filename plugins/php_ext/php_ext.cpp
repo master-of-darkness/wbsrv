@@ -388,14 +388,12 @@ private:
         std::string full_path = context.getMetadata("document_root").asString() + context.request->path;
 
         try {
-            // FIX 5: More explicit server context setup
             SG(server_context) = (void *)1;
             SG(sapi_headers).http_response_code = 200;
             SG(request_info).request_method = estrdup(httpMethodToString(context.request->method).c_str());
             SG(request_info).request_uri = estrdup(context.request->path.c_str());
             SG(request_info).query_string = estrdup(context.request->query.c_str());
 
-            // FIX 6: Explicitly set content length and ensure it's available
             SG(request_info).content_length = static_cast<long>(context.request->body.size());
 
             std::string content_type = context.request->getHeader("Content-Type");
