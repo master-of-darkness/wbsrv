@@ -1,16 +1,15 @@
-# Benchmark executable
-add_executable(benchmark_concurrent_lru_cache
-        benchmark_concurrent_lru_cache.cpp
-        ${CMAKE_SOURCE_DIR}/src/utils/concurrent_cache.h
+
+
+add_executable(test_server
+    test_server.cpp
 )
 
-target_include_directories(benchmark_concurrent_lru_cache PRIVATE
-        ${CMAKE_SOURCE_DIR}/src
-        ${CMAKE_SOURCE_DIR}/include
-)
+target_link_libraries(test_server
+PRIVATE
+        proxygen::proxygen
+        proxygen::proxygenhttpserver
 
-target_link_libraries(benchmark_concurrent_lru_cache
-        benchmark::benchmark
 )
 
 add_subdirectory(plugin)
+

@@ -53,7 +53,7 @@ namespace PluginManager {
     };
 
     struct HttpResponse {
-        int statusCode{200};
+        int statusCode{0};
         std::string statusMessage{"OK"};
         std::unordered_map<std::string, std::string> headers;
         std::string body;

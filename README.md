@@ -11,7 +11,7 @@
 - **High Performance** – Handles thousands of concurrent connections with event-driven architecture.
 - **Scalable** – Easily configurable for multi-threaded deployments on multi-core systems.
 - **Easy to Configure** – YAML-based configuration files for server and virtual hosts.
-- **Smart Caching** – Built-in LRU (Least Recently Used) cache to store frequently accessed content in memory.
+- **Smart Caching** – Built-in ARC (Adaptive Replacement Cache) to store frequently accessed content in memory.
 - [**PHP Support**](https://github.com/master-of-darkness/wbsrv/tree/master/php_ext) – Native support for embedded PHP execution using the Embed SAPI.
 - **Extensions API for Developers** – Add new features yourself. Check out the [example](https://github.com/master-of-darkness/wbsrv/blob/master/tests/plugin/ExamplePlugin.cpp).
 ---
@@ -112,7 +112,7 @@ From the `build` directory:
 
 - [Proxygen](https://github.com/facebook/proxygen) – HTTP framework
 - [yaml-cpp](https://github.com/jbeder/yaml-cpp) – YAML configuration parser
-
+- [xxHash](https://github.com/Cyan4973/xxHash) - Fast hashing library for caching
 ---
 
 ## 🔭 Roadmap

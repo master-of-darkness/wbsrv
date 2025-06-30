@@ -17,7 +17,7 @@ endif ()
 
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -fpermissive")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-Ofast")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -ffast-math")
 
 # VCPKG settings
 set(VCPKG_TARGET_ARCHITECTURE x64)
@@ -33,6 +33,7 @@ find_package(proxygen CONFIG REQUIRED)
 find_package(yaml-cpp CONFIG REQUIRED)
 find_package(gflags REQUIRED)
 find_package(benchmark REQUIRED)
+find_package(xxHash REQUIRED)
 
 # Add subdirectories for each component
 add_subdirectory(src)

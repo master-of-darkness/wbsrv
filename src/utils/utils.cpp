@@ -1,9 +1,7 @@
 #include "utils.h"
 
-utils::ConcurrentLRUCache<std::string, CacheRow> utils::cache(256);
-
 namespace utils {
-    const char* getContentType(const std::string& path) {
+    const char *getContentType(const std::string &path) {
         const size_t len = path.length();
         if (len < 3) return "application/octet-stream";
 
@@ -52,7 +50,7 @@ namespace utils {
         // .jpeg / .JPEG
         if (len >= 5 && (c1 == 'g' || c1 == 'G') && (c2 == 'e' || c2 == 'E') &&
             (c3 == 'p' || c3 == 'P') && (c4 == 'j' || c4 == 'J') &&
-            (path[len - 5] == '.' )) {
+            (path[len - 5] == '.')) {
             return "image/jpeg";
         }
 
@@ -197,16 +195,24 @@ namespace utils {
         return "application/octet-stream";
     }
 
-    const char* getErrorPage(const int error) {
+    const char *getErrorPage(const int error) {
         switch (error) {
-            case 400: return "<html><head><title>400 Bad Request</title></head><body><center><h1>400 Bad Request</h1></center><hr><center>WBSRV</center></body></html>";
-            case 403: return "<html><head><title>403 Forbidden</title></head><body><center><h1>403 Forbidden</h1></center><hr><center>WBSRV</center></body></html>";
-            case 404: return "<html><head><title>404 Not Found</title></head><body><center><h1>404 Not Found</h1></center><hr><center>WBSRV</center></body></html>";
-            case 405: return "<html><head><title>405 Method Not Allowed</title></head><body><center><h1>405 Method Not Allowed</h1></center><hr><center>WBSRV</center></body></html>";
-            case 500: return "<html><head><title>500 Internal Server Error</title></head><body><center><h1>500 Internal Server Error</h1></center><hr><center>WBSRV</center></body></html>";
-            case 502: return "<html><head><title>502 Bad Gateway</title></head><body><center><h1>502 Bad Gateway</h1></center><hr><center>WBSRV</center></body></html>";
-            case 503: return "<html><head><title>503 Service Unavailable</title></head><body><center><h1>503 Service Unavailable</h1></center><hr><center>WBSRV</center></body></html>";
-            case 504: return "<html><head><title>504 Gateway Timeout</title></head><body><center><h1>504 Gateway Timeout</h1></center><hr><center>WBSRV</center></body></html>";
+            case 400: return
+                        "<html><head><title>400 Bad Request</title></head><body><center><h1>400 Bad Request</h1></center><hr><center>WBSRV</center></body></html>";
+            case 403: return
+                        "<html><head><title>403 Forbidden</title></head><body><center><h1>403 Forbidden</h1></center><hr><center>WBSRV</center></body></html>";
+            case 404: return
+                        "<html><head><title>404 Not Found</title></head><body><center><h1>404 Not Found</h1></center><hr><center>WBSRV</center></body></html>";
+            case 405: return
+                        "<html><head><title>405 Method Not Allowed</title></head><body><center><h1>405 Method Not Allowed</h1></center><hr><center>WBSRV</center></body></html>";
+            case 500: return
+                        "<html><head><title>500 Internal Server Error</title></head><body><center><h1>500 Internal Server Error</h1></center><hr><center>WBSRV</center></body></html>";
+            case 502: return
+                        "<html><head><title>502 Bad Gateway</title></head><body><center><h1>502 Bad Gateway</h1></center><hr><center>WBSRV</center></body></html>";
+            case 503: return
+                        "<html><head><title>503 Service Unavailable</title></head><body><center><h1>503 Service Unavailable</h1></center><hr><center>WBSRV</center></body></html>";
+            case 504: return
+                        "<html><head><title>504 Gateway Timeout</title></head><body><center><h1>504 Gateway Timeout</h1></center><hr><center>WBSRV</center></body></html>";
             default: return nullptr;
         }
     }

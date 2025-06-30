@@ -5,5 +5,5 @@
   }, {
     "name" : "benchmark",
     "version>=" : "1.9.1"
-  } ]
+  }, "xxhash" ]
 }

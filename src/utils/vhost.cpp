@@ -4,8 +4,8 @@
 #include "utils/defines.h"
 #include "config.h"
 
-
-utils::ConcurrentLRUCache<std::string, vhost::vinfo> vhost::list(256);
+cache::arc_cache<std::string, vhost::vinfo> vhost::list(100);
+cache::arc_cache<std::string, vhost::FileMetadata> vhost::file_metadata(1000);
 
 bool vhost::load(std::vector<proxygen::HTTPServer::IPConfig> &config) {
     for (const auto &i: std::filesystem::directory_iterator(std::string(CONFIG_DIR) + "/hosts")) {
@@ -15,6 +15,7 @@ bool vhost::load(std::vector<proxygen::HTTPServer::IPConfig> &config) {
                 proxygen::HTTPServer::IPConfig vhost(folly::SocketAddress("0.0.0.0", host.port, false),
                                                      proxygen::HTTPServer::Protocol::HTTP);
 
+
                 if (host.ssl) {
                     wangle::SSLContextConfig cert;
                     cert.setCertificate(host.cert, host.private_key, host.password);
@@ -22,7 +23,21 @@ bool vhost::load(std::vector<proxygen::HTTPServer::IPConfig> &config) {
                     vhost.sslConfigs.push_back(cert);
                     vhost.sslConfigs[0].isDefault = true;
                 }
+                FileMetadata rootMeta{};
+                rootMeta.is_directory = std::filesystem::is_directory(host.www_dir);
+                file_metadata.put(host.www_dir + "/", rootMeta);
 
+                if (rootMeta.is_directory) {
+                    for (const auto &entry: std::filesystem::recursive_directory_iterator(host.www_dir)) {
+                        FileMetadata meta{};
+                        meta.is_directory = entry.is_directory();
+                        file_metadata.put(entry.path().string(), meta);
+                    }
+                }
+
+                if (!host.www_dir.empty() && host.www_dir.back() == '/') {
+                    host.www_dir.pop_back();
+                }
 
                 list.put(host.hostname + ':' + std::to_string(host.port),
                          vinfo(

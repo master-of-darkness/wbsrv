@@ -429,68 +429,11 @@ namespace PluginManager {
             loadedPlugins_.clear();
         }
 
-        bool reloadPlugin(const std::string &name) {
-            std::shared_lock lock(pluginsMutex_);
-
-            auto it = loadedPlugins_.find(name);
-            if (it == loadedPlugins_.end()) {
-                return false;
-            }
-
-            std::string path = it->second.path;
-            folly::dynamic config = ProxygenBridge::convertToFolly(it->second.config);
-
-            lock.unlock();
-
-            return unloadPlugin(name) && loadPlugin(path, config);
-        }
-
-        std::vector<std::string> getLoadedPlugins() const {
-            std::shared_lock lock(pluginsMutex_);
-
-            std::vector<std::string> plugins;
-            plugins.reserve(loadedPlugins_.size());
-
-            for (const auto &[name, _]: loadedPlugins_) {
-                plugins.push_back(name);
-            }
-
-            return plugins;
-        }
-
         IPlugin *getPlugin(const std::string &name) const {
             std::shared_lock lock(pluginsMutex_);
 
             auto it = loadedPlugins_.find(name);
             return (it != loadedPlugins_.end()) ? it->second.plugin.get() : nullptr;
-        }
-
-        folly::dynamic getPluginInfo(const std::string &name) const {
-            std::shared_lock lock(pluginsMutex_);
-
-            auto it = loadedPlugins_.find(name);
-            if (it == loadedPlugins_.end()) {
-                return folly::dynamic();
-            }
-
-            return folly::dynamic::object
-                    ("name", it->second.plugin->getName())
-                    ("version", it->second.plugin->getVersion())
-                    ("description", it->second.plugin->getDescription())
-                    ("path", it->second.path)
-                    ("dependencies", folly::dynamic(it->second.dependencies.begin(),
-                                                    it->second.dependencies.end()));
-        }
-
-        folly::dynamic getAllPluginsInfo() const {
-            std::shared_lock lock(pluginsMutex_);
-
-            folly::dynamic plugins = folly::dynamic::array();
-            for (const auto &[name, loadedPlugin]: loadedPlugins_) {
-                plugins.push_back(getPluginInfo(name));
-            }
-
-            return plugins;
         }
     };
 }

@@ -13,6 +13,7 @@ target_link_libraries(wbsrv PRIVATE
         proxygen::proxygen
         proxygen::proxygenhttpserver
         yaml-cpp::yaml-cpp
+        xxHash::xxhash
 )
 
 target_compile_definitions(wbsrv PRIVATE $<$<CONFIG:Debug>:DEBUG>)

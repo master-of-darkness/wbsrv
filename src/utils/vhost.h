@@ -6,6 +6,8 @@
 
 #include "utils/utils.h"
 
+#include "cache.h"
+
 namespace vhost {
     typedef struct vinfo_t {
         std::string web_dir;
@@ -18,7 +20,13 @@ namespace vhost {
         }
     } vinfo;
 
-    extern utils::ConcurrentLRUCache<std::string, vinfo> list;
+    struct FileMetadata {
+        bool is_directory;
+        // TODO: Add more metadata fields as needed
+    };
+
+    extern cache::arc_cache<std::string, vinfo> list;
+    extern cache::arc_cache<std::string, FileMetadata> file_metadata;
 
     bool load(std::vector<proxygen::HTTPServer::IPConfig> &config);
 }
