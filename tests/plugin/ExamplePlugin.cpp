@@ -1,4 +1,4 @@
-#include "interface.h" // Assuming the header file is named plugin_manager.h
+#include "interface.h"
 #include <iostream>
 #include <sstream>
 
@@ -146,10 +146,10 @@ extern "C" {
     }
 
     const char* getPluginDescription() {
-        return "A simple hello world plugin that demonstrates the plugin framework";
+        return "A simple hello world plugin that demonstrates the plugin API";
     }
 
     int getPluginAPIVersion() {
-        return 1; // API version this plugin was built against
+        return 1; // API version this plugin was built against, currently no need
     }
 }
