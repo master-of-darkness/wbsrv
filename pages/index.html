@@ -1,104 +1,239 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>wbsrv - GitHub Pages</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      margin: 0;
-      padding: 0;
-      background: #f4f4f4;
-      color: #333;
-      font-size: 1.1rem;
-    }
-    header {
-      background: #222;
-      color: white;
-      padding: 1.1rem;
-      text-align: center;
-    }
-    main {
-      max-width: 1056px;
-      margin: auto;
-      padding: 2.2rem;
-      background: white;
-    }
-    h1 {
-      font-size: 2.2rem;
-    }
-    h2 {
-      font-size: 1.76rem;
-      border-bottom: 2px solid #ddd;
-      padding-bottom: 0.33rem;
-    }
-    .graph-gallery {
-      display: flex;
-      flex-wrap: nowrap;
-      gap: 1.1rem;
-      justify-content: center;
-      align-items: center;
-    }
-    .graph-gallery img {
-      width: 45%;
-      height: auto;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      object-fit: contain;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>wbsrv - Ultra-Fast C++ Web Server</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.3/cdn.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+          rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .card-glass {
+            backdrop-filter: blur(16px);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .text-gradient {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+
+        .animate-glow {
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        .animate-slide-up {
+            animation: slideUp 0.8s ease-out forwards;
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.6s ease-out forwards;
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-20px);
+            }
+        }
+
+        @keyframes glow {
+            from {
+                box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
+            }
+            to {
+                box-shadow: 0 0 40px rgba(102, 126, 234, 0.6);
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .mesh-gradient {
+            background: radial-gradient(circle at 25% 25%, rgba(102, 126, 234, 0.1) 0%, transparent 50%),
+            radial-gradient(circle at 75% 75%, rgba(118, 75, 162, 0.1) 0%, transparent 50%);
+        }
+    </style>
 </head>
-<body>
+<body class="bg-gray-900 text-white overflow-x-hidden">
+<div class="fixed inset-0 mesh-gradient animate-pulse"></div>
 
-  <header>
-    <h1>wbsrv - Lightweight Web Server in C++</h1>
-    <p><a href="https://github.com/master-of-darkness/wbsrv" style="color: #0bf;">GitHub Repository</a></p>
-  </header>
+<header class="relative gradient-bg overflow-hidden">
+    <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent transform -skew-y-12 animate-pulse"></div>
+    <div class="relative z-10 container mx-auto px-4 py-20 text-center">
+        <div class="animate-slide-up">
+            <h1 class="text-5xl md:text-7xl font-extrabold mb-6 text-white drop-shadow-2xl animate-float">
+                wbsrv
+            </h1>
+            <p class="text-xl md:text-2xl mb-8 text-white/90 font-light max-w-2xl mx-auto">
+                Ultra-Fast C++ Web Server Built for Performance
+            </p>
+            <a class="inline-flex items-center gap-3 bg-white/20 hover:bg-white/30 px-8 py-4 rounded-full border border-white/30 backdrop-blur-sm transition-all duration-300 hover:scale-105 animate-glow"
+               href="https://github.com/master-of-darkness/wbsrv">
+                <span class="text-2xl">⭐</span>
+                <span class="font-semibold">View on GitHub</span>
+            </a>
+        </div>
+    </div>
+</header>
 
-  <main>
-    <section>
-      <h2>About the Project</h2>
-      <p>
-        <strong>wbsrv</strong> is a minimal, fast, and embeddable web server written in C++. It's designed for high-performance, multi-threaded web serving.
-        <br><br>
-        Build guide is available in the repository README: <a href="https://github.com/master-of-darkness/wbsrv?tab=readme-ov-file#-build-instructions-ubuntu" style="color: #0bf;">Steps to build</a>
-      </p>
+<main class="relative z-10 container mx-auto px-4 py-16 space-y-16">
+    <section
+            class="card-glass rounded-3xl p-8 md:p-12 border border-white/10 hover:border-white/20 transition-all duration-500 hover:translate-y-[-8px] animate-fade-in">
+        <h2 class="text-3xl md:text-4xl font-bold mb-6 text-gradient">About the Project</h2>
+        <p class="text-lg text-gray-300 mb-8 leading-relaxed">
+            <span class="text-white font-semibold">wbsrv</span> is a minimal, fast, and embeddable web server written in
+            C++.
+            Designed for high-performance, multi-threaded web serving with modern architecture and safety in mind.
+        </p>
+        <div class="bg-blue-500/10 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm">
+            <p class="text-blue-200 flex items-center gap-2">
+                <span class="text-2xl">📖</span>
+                <span><strong>Build Guide:</strong> Complete instructions available in the
+                    <a class="text-cyan-400 hover:text-cyan-300 underline underline-offset-4"
+                       href="https://github.com/master-of-darkness/wbsrv?tab=readme-ov-file#-build-instructions-ubuntu">repository README</a></span>
+            </p>
+        </div>
     </section>
 
-    <section>
-      <h2>Key Advantages</h2>
-      <ul>
-        <li>Written in modern C++ with performance and safety in mind</li>
-        <li>Supports multi-threading and high-concurrency</li>
-        <li>Easy to install</li>
-        <li>Supports PHP execution</li>
-        <li>Built-in caching system for pages</li>
-      </ul>
+    <section
+            class="card-glass rounded-3xl p-8 md:p-12 border border-white/10 hover:border-white/20 transition-all duration-500 hover:translate-y-[-8px]"
+            x-data="{ visible: false }"
+            x-intersect="visible = true">
+        <h2 class="text-3xl md:text-4xl font-bold mb-8 text-gradient">Key Features</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="card-glass rounded-2xl p-6 border border-white/10 hover:border-purple-500/50 transition-all duration-300 hover:scale-105 group">
+                <div class="text-4xl mb-4 group-hover:animate-bounce">🚀</div>
+                <h3 class="text-lg font-semibold mb-2 text-white">High Performance</h3>
+                <p class="text-gray-400 text-sm">Written in modern C++ with performance and safety as core
+                    principles</p>
+            </div>
+            <div class="card-glass rounded-2xl p-6 border border-white/10 hover:border-yellow-500/50 transition-all duration-300 hover:scale-105 group">
+                <div class="text-4xl mb-4 group-hover:animate-bounce">⚡</div>
+                <h3 class="text-lg font-semibold mb-2 text-white">Multi-Threading</h3>
+                <p class="text-gray-400 text-sm">Supports multi-threading and high-concurrency operations</p>
+            </div>
+            <div class="card-glass rounded-2xl p-6 border border-white/10 hover:border-blue-500/50 transition-all duration-300 hover:scale-105 group">
+                <div class="text-4xl mb-4 group-hover:animate-bounce">🐘</div>
+                <h3 class="text-lg font-semibold mb-2 text-white">PHP Support</h3>
+                <p class="text-gray-400 text-sm">Official plugin supports PHP execution capabilities for dynamic content</p>
+            </div>
+            <div class="card-glass rounded-2xl p-6 border border-white/10 hover:border-green-500/50 transition-all duration-300 hover:scale-105 group">
+                <div class="text-4xl mb-4 group-hover:animate-bounce">💾</div>
+                <h3 class="text-lg font-semibold mb-2 text-white">Smart Caching</h3>
+                <p class="text-gray-400 text-sm">Built-in caching system for optimized page delivery</p>
+            </div>
+        </div>
     </section>
 
-    <section>
-      <h2>Current Status</h2>
-      <p>
-        The project is under active development. Core HTTP handling and threading mechanisms are implemented. PHP embedding works, however is in progress and needs improvements. Planned future features include:
-        <ul>
-          <li>Better configuration system and flexibility</li>
-          <li>HTTP/3 support</li>
-          <li>Logging & monitoring tools</li>
-          <li> ✅ Extensions API for C++</li>
-        </ul>
-      </p>
+    <section
+            class="card-glass rounded-3xl p-8 md:p-12 border border-white/10 hover:border-white/20 transition-all duration-500 hover:translate-y-[-8px]">
+        <h2 class="text-3xl md:text-4xl font-bold mb-6 text-gradient">Development Status</h2>
+        <p class="text-gray-300 mb-8 text-lg">
+            The project is under active development with core HTTP handling and threading mechanisms implemented.
+        </p>
+        <div class="space-y-4">
+            <div class="flex items-center gap-4 p-4 card-glass rounded-xl border border-white/10 hover:border-green-500/30 transition-all duration-300 hover:translate-x-2">
+                <span class="text-2xl text-green-400">✅</span>
+                <span class="text-white font-medium">Better configuration system and flexibility</span>
+            </div>
+            <div class="flex items-center gap-4 p-4 card-glass rounded-xl border border-white/10 hover:border-green-500/30 transition-all duration-300 hover:translate-x-2">
+                <span class="text-2xl text-green-400">✅</span>
+                <span class="text-white font-medium">Extensions API for C++</span>
+            </div>
+            <div class="flex items-center gap-4 p-4 card-glass rounded-xl border border-white/10 hover:border-yellow-500/30 transition-all duration-300 hover:translate-x-2">
+                <span class="text-2xl text-yellow-400 animate-spin">🔄</span>
+                <span class="text-white font-medium">HTTP/3 support</span>
+            </div>
+            <div class="flex items-center gap-4 p-4 card-glass rounded-xl border border-white/10 hover:border-yellow-500/30 transition-all duration-300 hover:translate-x-2">
+                <span class="text-2xl text-yellow-400 animate-spin">🔄</span>
+                <span class="text-white font-medium">Logging & monitoring tools</span>
+            </div>
+            <div class="flex items-center gap-4 p-4 card-glass rounded-xl border border-white/10 hover:border-yellow-500/30 transition-all duration-300 hover:translate-x-2">
+                <span class="text-2xl text-yellow-400 animate-spin">🔄</span>
+                <span class="text-white font-medium">PHP Configuration support</span>
+            </div>
+          <div class="flex items-center gap-4 p-4 card-glass rounded-xl border border-white/10 hover:border-yellow-500/30 transition-all duration-300 hover:translate-x-2">
+            <span class="text-2xl text-yellow-400 animate-spin">🔄</span>
+            <span class="text-white font-medium">Upgrades for websockets</span>
+          </div>
+        </div>
     </section>
 
-    <section>
-      <h2>Graph Visualization</h2>
-      <p>Below are graphs and metrics related to the performance.</p>
-      <div class="graph-gallery">
-        <img src="images/graph1.png" alt="Graph 1" style="display:inline-block;">
-        <img src="images/graph2.png" alt="Graph 2" style="display:inline-block;">
-      </div>
+    <section
+            class="card-glass rounded-3xl p-8 md:p-12 border border-white/10 hover:border-white/20 transition-all duration-500 hover:translate-y-[-8px]">
+        <h2 class="text-3xl md:text-4xl font-bold mb-6 text-gradient">Performance Metrics</h2>
+        <p class="text-gray-300 mb-8 text-lg">
+            Visual representation of performance benchmarks.
+        </p>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div class="card-glass rounded-2xl p-6 border border-white/10 hover:border-cyan-500/50 transition-all duration-300 hover:scale-105 group">
+                <div class="bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-xl p-8 text-center">
+                    <img alt="Graph 1" src="images/graph1.png" style="display:inline-block;">
+                </div>
+            </div>
+            <div class="card-glass rounded-2xl p-6 border border-white/10 hover:border-purple-500/50 transition-all duration-300 hover:scale-105 group">
+                <div class="bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl p-8 text-center">
+                    <img alt="Graph 2" src="images/graph2.png" style="display:inline-block;">
+                </div>
+            </div>
+        </div>
     </section>
-  </main>
+</main>
 
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('animate-fade-in');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('section').forEach(section => {
+            observer.observe(section);
+        });
+    });
+</script>
 </body>
 </html>
