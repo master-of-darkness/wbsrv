@@ -1,7 +1,6 @@
 # Test plugin library
 add_library(test_plugin SHARED
         ExamplePlugin.cpp
-        ExamplePlugin.h
         ${CMAKE_SOURCE_DIR}/include/interface.h
 )
 

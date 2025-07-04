@@ -1,17 +1,30 @@
 #pragma once
 
 #include <yaml-cpp/yaml.h>
+#include <proxygen/httpserver/HTTPServer.h>
+#include <utility>
+#include "utils/utils.h"
+#include "cache.h"
+#include "interface.h"
 
 namespace Config {
-    class GeneralConfig {
+    class ServerConfig {
     public:
-        explicit GeneralConfig(std::string path) {
+        explicit ServerConfig(std::string path) {
             path_ = std::move(path);
         }
 
         bool load();
 
         int threads = 0;
+
+        struct PluginConfig {
+            std::string path;
+            bool enabled{true};
+            std::unordered_map<std::string, PluginManager::ConfigValue> parameters;
+        };
+
+        std::vector<PluginConfig> plugins;
 
     private:
         std::string path_;
@@ -39,4 +52,7 @@ namespace Config {
     private:
         std::string path_;
     };
+
+
+    bool load_virtual_host_configurations(std::vector<proxygen::HTTPServer::IPConfig> &ip_configs);
 }

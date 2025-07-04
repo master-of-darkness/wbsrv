@@ -1,4 +1,5 @@
 #pragma once
+#define STATUS_101 101, "Switching Protocols"
 #define STATUS_200 200, "OK"
 #define STATUS_404 404, "Not found"
 #define STATUS_400 400, "Bad request"
@@ -16,7 +17,7 @@
 #define CONFIG_DIR "/etc/wbsrv/"
 #define DAEMON_NAME "webserver"
 #define DEFAULTPAGE_FILENAME "index.html"
-#define VERSION "1.2"
+#define VERSION_NUM "1.2"
 #define NAME_N_VERSION "wbsrv rc"
 
 #define CACHE_TTL 300 // 5 minutes

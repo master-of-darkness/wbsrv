@@ -8,7 +8,7 @@
 #include <xxhash.h> // xxh3_64bits
 #include <folly/container/F14Map.h>
 
-namespace cache {
+namespace Cache {
     template<typename Key>
     struct xxh3_hash {
         std::size_t operator()(const Key &key) const {
@@ -24,7 +24,7 @@ namespace cache {
     };
 
     template<typename Key, typename Value, typename Hasher = xxh3_hash<Key> >
-    class arc_cache {
+    class ARC {
     public:
         using key_value_pair_t = std::pair<Key, Value>;
         using list_iterator_t = typename std::list<key_value_pair_t>::iterator;
@@ -58,18 +58,18 @@ namespace cache {
             CacheEntry &operator=(CacheEntry &&) = default;
         };
 
-        explicit arc_cache(std::size_t max_size) noexcept
+        explicit ARC(std::size_t max_size) noexcept
             : max_size_(max_size), p_(0) {
         }
 
         // Move-only
-        arc_cache(const arc_cache &) = delete;
+        ARC(const ARC &) = delete;
 
-        arc_cache &operator=(const arc_cache &) = delete;
+        ARC &operator=(const ARC &) = delete;
 
-        arc_cache(arc_cache &&) noexcept = default;
+        ARC(ARC &&) noexcept = default;
 
-        arc_cache &operator=(arc_cache &&) noexcept = default;
+        ARC &operator=(ARC &&) noexcept = default;
 
         void put(const Key &key, const Value &value) {
             auto it = map_.find(key);
@@ -321,4 +321,24 @@ namespace cache {
         std::size_t max_size_;
         std::size_t p_; // Target size for T1
     };
-} // namespace cache
+
+    struct VirtualHostConfig {
+        std::string web_root_directory;
+        std::vector<std::string> index_page_files;
+
+        VirtualHostConfig() = default;
+
+        VirtualHostConfig(std::string web_root, std::vector<std::string> index_files)
+            : web_root_directory(std::move(web_root))
+              , index_page_files(std::move(index_files)) {
+        }
+    };
+
+    struct FileSystemMetadata {
+        bool is_directory;
+        // TODO: Add more metadata fields as needed
+    };
+
+    extern ARC<std::string, VirtualHostConfig> host_config_cache;
+    extern ARC<std::string, FileSystemMetadata> file_metadata_cache;
+} // namespace Cache

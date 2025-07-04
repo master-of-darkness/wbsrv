@@ -180,9 +180,9 @@ void wbsrv_php_register_variables(zval *track_vars_array) {
         php_register_variable("CONTENT_TYPE", content_type.c_str(), track_vars_array);
     }
 
-    for (const auto &[header, value] : req->headers) {
+    for (const auto &[header, value]: req->headers) {
         std::string var_name = header;
-        for (auto& c : var_name) {
+        for (auto &c: var_name) {
             if (c == '-') c = '_';
             c = std::toupper(c);
         }
@@ -289,11 +289,11 @@ public:
 class PHPExtension : public IPlugin {
 private:
     bool initialized_ = false;
-    ConfigValue config_;
+    std::unordered_map<std::string, ConfigValue> config_;
     std::vector<std::string> php_extensions_;
 
 public:
-    bool initialize(const ConfigValue &config) override {
+    bool initialize(const std::unordered_map<std::string, ConfigValue> &config) override {
         config_ = config;
 
         php_tsrm_startup();
@@ -335,36 +335,27 @@ public:
     void registerHooks(HookManager &hookManager) override {
         // Register POST_REQUEST hook with high priority to handle PHP files
         hookManager.registerHook(HookType::POST_REQUEST, getName(),
-            [this](RequestContext &context) -> bool {
-                return handlePostRequest(context);
-            }, 100); // High priority to handle PHP files first
+                                 [this](RequestContext &context) -> bool {
+                                     return handlePostRequest(context);
+                                 }, 100); // High priority to handle PHP files first
 
         // Register PRE_RESPONSE hook to modify headers if needed
         hookManager.registerHook(HookType::PRE_RESPONSE, getName(),
-            [this](RequestContext &context) -> bool {
-                return handlePreResponse(context);
-            }, 50);
+                                 [this](RequestContext &context) -> bool {
+                                     return handlePreResponse(context);
+                                 }, 50);
 
         // Register POST_RESPONSE hook for cleanup and logging
         hookManager.registerHook(HookType::POST_RESPONSE, getName(),
-            [this](RequestContext &context) -> bool {
-                return handlePostResponse(context);
-            }, 50);
+                                 [this](RequestContext &context) -> bool {
+                                     return handlePostResponse(context);
+                                 }, 50);
     }
 
-    bool validateConfig(const ConfigValue &config) const override {
-        if (config.hasKey("document_root") && !config["document_root"].isString()) {
-            return false;
-        }
+    bool validateConfig(const std::unordered_map<std::string, ConfigValue> &config) const override {
+        // Currently we do not have specific validation logic
+        // TODO: add PHP configuration
         return true;
-    }
-
-    std::vector<std::string> getDependencies() const override {
-        return {}; // No dependencies
-    }
-
-    std::vector<std::string> getProvides() const override {
-        return {"php", "scripting"};
     }
 
 private:
@@ -377,19 +368,17 @@ private:
         return executePhpScript(context);
     }
 
-    bool handlePreResponse(RequestContext &context) {
+    static bool handlePreResponse(RequestContext &context) {
         if (!isPhpFile(context.request->path) || context.response->statusCode == 0) {
             return true; // Continue processing
         }
 
-        if (context.response->headers.find("X-Powered-By") == context.response->headers.end()) {
-            context.response->headers["X-Powered-By"] = "WBSRV/2.0 PHP Extension";
-        }
+        context.response->headers["X-Powered-By"] = "WBSRV/2.0 PHP Extension";
 
         return true; // Continue processing
     }
 
-    bool handlePostResponse(RequestContext &context) {
+    static bool handlePostResponse(RequestContext &context) {
         if (!isPhpFile(context.request->path)) {
             return true; // Continue processing
         }
@@ -399,17 +388,18 @@ private:
         read_post_offset = 0;
         tl_headers_to_send.clear();
 
-        auto duration = std::chrono::steady_clock::now() - context.startTime;
-        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
-
-
         return true; // Continue processing
     }
 
-    bool isPhpFile(const std::string& path) const {
-        return path.length() >= 4 &&
-               path.compare(path.length() - 4, 4, ".php") == 0;
+    static bool isPhpFile(const std::string& path) {
+        size_t len = path.length();
+        return len >= 4 &&
+               path[len - 4] == '.' &&
+               path[len - 3] == 'p' &&
+               path[len - 2] == 'h' &&
+               path[len - 1] == 'p';
     }
+
 
     bool executePhpScript(RequestContext &context) {
         if (!initialized_) {
@@ -427,10 +417,20 @@ private:
         ts_resource(0);
         OutputCapture capture;
 
-        std::string full_path = context.getMetadata("document_root").asString() + context.request->path;
+        // Get document root from config or use default
+        std::string doc_root = "/var/www/html";
+        auto doc_root_it = config_.find("document_root");
+        if (doc_root_it != config_.end() && doc_root_it->second.isString()) {
+            doc_root = doc_root_it->second.asString();
+        }
+
+        // Set document root in context metadata for use in PHP variables
+        context.setMetadata("document_root", ConfigValue(doc_root));
+
+        std::string full_path = doc_root + context.request->path;
 
         // Initialize SAPI globals
-        SG(server_context) = (void *)1;
+        SG(server_context) = (void *) 1;
         SG(sapi_headers).http_response_code = 200;
         SG(request_info).request_method = estrdup(httpMethodToString(context.request->method).c_str());
         SG(request_info).request_uri = estrdup(context.request->path.c_str());
@@ -475,39 +475,40 @@ private:
         zend_stream_init_filename(&file_handle, full_path.c_str());
 
         bool execution_success = false;
-        zend_try {
-            CG(skip_shebang) = true;
-            php_execute_script(&file_handle);
+        zend_try
+            {
+                CG(skip_shebang) = true;
+                php_execute_script(&file_handle);
 
-            // Get output and headers
-            context.response->body = capture.getOutput();
-            context.response->headers = tl_headers_to_send;
+                // Get output and headers
+                context.response->body = capture.getOutput();
+                context.response->headers = tl_headers_to_send;
 
-            // Set default content type if not set
-            if (context.response->headers.find("Content-Type") == context.response->headers.end()) {
-                context.response->setHeader("Content-Type", "text/html; charset=UTF-8");
+                // Set default content type if not set
+                if (context.response->headers.find("Content-Type") == context.response->headers.end()) {
+                    context.response->setHeader("Content-Type", "text/html; charset=UTF-8");
+                }
+
+                // Set status code from PHP (if changed)
+                if (SG(sapi_headers).http_response_code != 200) {
+                    context.response->statusCode = SG(sapi_headers).http_response_code;
+                } else {
+                    context.response->setStatus(200, "OK");
+                }
+
+                execution_success = true;
             }
-
-            // Set status code from PHP (if changed)
-            if (SG(sapi_headers).http_response_code != 200) {
-                context.response->statusCode = SG(sapi_headers).http_response_code;
-            } else {
-                context.response->setStatus(200, "OK");
-            }
-
-            execution_success = true;
-        }
         zend_catch {
-            context.response->setStatus(500, "Internal Server Error");
-            context.response->body = "PHP execution failed";
+                context.response->setStatus(500, "Internal Server Error");
+                context.response->body = "PHP execution failed";
 
-            std::string error_output = capture.getOutput();
-            if (!error_output.empty()) {
-                context.response->body += "\nOutput before error: " + error_output;
+                std::string error_output = capture.getOutput();
+                if (!error_output.empty()) {
+                    context.response->body += "\nOutput before error: " + error_output;
+                }
+                context.response->setTextContent();
+                execution_success = false;
             }
-            context.response->setTextContent();
-            execution_success = false;
-        }
         zend_end_try();
 
         // Cleanup
@@ -518,29 +519,28 @@ private:
     }
 };
 
-
 extern "C" {
-    IPlugin *createPlugin() {
-        return new PHPExtension();
-    }
+IPlugin *createPlugin() {
+    return new PHPExtension();
+}
 
-    void destroyPlugin(IPlugin *plugin) {
-        delete plugin;
-    }
+void destroyPlugin(IPlugin *plugin) {
+    delete plugin;
+}
 
-    const char *getPluginName() {
-        return "PHP Extension";
-    }
+const char *getPluginName() {
+    return "PHP Extension";
+}
 
-    const char *getPluginVersion() {
-        return "2.0.0";
-    }
+const char *getPluginVersion() {
+    return "2.0.0";
+}
 
-    const char *getPluginDescription() {
-        return "PHP script execution engine for WBSRV";
-    }
+const char *getPluginDescription() {
+    return "PHP script execution engine for WBSRV";
+}
 
-    int getPluginAPIVersion() {
-        return 1;
-    }
+int getPluginAPIVersion() {
+    return 1;
+}
 }

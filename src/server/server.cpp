@@ -9,16 +9,6 @@
 
 using namespace proxygen;
 
-void convertHeaders(const proxygen::HTTPHeaders &headers,
-                    std::unordered_map<std::string, std::string> &result) {
-    result.clear();
-    result.reserve(headers.size());
-
-    headers.forEach([&result](const std::string &name, const std::string &value) {
-        result.emplace(name, value);
-    });
-}
-
 std::string convertBodyToString(const std::unique_ptr<folly::IOBuf> &body) {
     if (!body) return "";
 
@@ -32,29 +22,11 @@ std::string convertBodyToString(const std::unique_ptr<folly::IOBuf> &body) {
     return result;
 }
 
-std::string getClientIP(const std::unique_ptr<HTTPMessage> &headers) {
-    auto clientIP = headers->getHeaders().getSingleOrEmpty("X-Forwarded-For");
-    if (!clientIP.empty()) {
-        auto commaPos = clientIP.find(',');
-        if (commaPos != std::string::npos) {
-            clientIP = clientIP.substr(0, commaPos);
-        }
-        return clientIP;
-    }
-
-    clientIP = headers->getHeaders().getSingleOrEmpty("X-Real-IP");
-    if (!clientIP.empty()) {
-        return clientIP;
-    }
-
-    return "127.0.0.1"; // Default for now
-}
 
 void StaticHandler::onRequest(std::unique_ptr<HTTPMessage> message) noexcept {
     headers_ = std::move(message);
     auto cache_acc = cache_->get(path_);
 
-    // Check if the path is already cached
     if (cache_acc.has_value() && headers_->getMethod() == HTTPMethod::GET) {
         const auto &cache_row = cache_acc.value();
         ResponseBuilder(downstream_)
@@ -85,13 +57,7 @@ void StaticHandler::processRequest() {
 }
 
 bool StaticHandler::handleHooks(PluginManager::HttpMethod method, const std::string &query) const {
-    PluginManager::HttpRequest request;
-    request.method = method;
-    request.path = headers_->getPath();
-    request.query = query;
-    convertHeaders(headers_->getHeaders(), request.headers);
-    request.body = convertBodyToString(body_);
-    request.clientIP = getClientIP(headers_);
+    PluginManager::HttpRequest request = PluginManager::ProxygenBridge::convertRequest(*headers_.get(), convertBodyToString(body_));
 
     PluginManager::HttpResponse response;
 
@@ -105,9 +71,9 @@ bool StaticHandler::handleHooks(PluginManager::HttpMethod method, const std::str
 
     bool handled = false;
     if (plugin_loader->executeHooks(PluginManager::HookType::PRE_REQUEST, context)) {
+        handled = true;
         if (plugin_loader->executeHooks(PluginManager::HookType::POST_REQUEST, context)) {
             plugin_loader->executeHooks(PluginManager::HookType::PRE_RESPONSE, context);
-            handled = true;
         }
     }
 
@@ -117,15 +83,8 @@ bool StaticHandler::handleHooks(PluginManager::HttpMethod method, const std::str
 
     event_base_->runInEventBaseThread([this, response = std::move(response)]() {
         if (error_ || finished_) return;
-
         auto rb = ResponseBuilder(downstream_);
-        rb.status(response.statusCode, response.statusMessage);
-
-        for (const auto &header: response.headers) {
-            rb.header(header.first, header.second);
-        }
-
-        rb.body(response.body);
+        PluginManager::ProxygenBridge::applyResponse(response, rb);
         rb.sendWithEOM();
     });
     plugin_loader->executeHooks(PluginManager::HookType::POST_RESPONSE, context);
@@ -184,7 +143,7 @@ void StaticHandler::readFile() const {
 
                 CacheRow row(cached_content_type_.data(), std::move(complete_buf));
 
-                CacheRow *row_ptr = new CacheRow(std::move(row));
+                auto *row_ptr = new CacheRow(std::move(row));
                 cache_->put(path_, row_ptr);
             }
 
@@ -235,7 +194,8 @@ void StaticHandler::onBody(std::unique_ptr<folly::IOBuf> body) noexcept {
     }
 }
 
-void StaticHandler::onUpgrade(UpgradeProtocol /*protocol*/) noexcept {
+void StaticHandler::onUpgrade(UpgradeProtocol protocol) noexcept {
+    LOG(ERROR) << headers_->getProtocolString();
 }
 
 void StaticHandler::requestComplete() noexcept {

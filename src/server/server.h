@@ -1,6 +1,6 @@
 #pragma once
 
-#include "utils/vhost.h"
+#include "utils/config.h"
 #include <folly/io/IOBufQueue.h>
 
 #include "interface.h"
@@ -11,7 +11,7 @@
 class StaticHandler : public proxygen::RequestHandler {
 public:
     explicit StaticHandler(std::string path, std::string web_root = "",
-                           cache::arc_cache<std::string, CacheRow *> *cache = nullptr): path_(std::move(path)),
+                           Cache::ARC<std::string, CacheRow *> *cache = nullptr): path_(std::move(path)),
         web_root_(std::move(web_root)),
         cache_(cache) {
     }
@@ -50,7 +50,7 @@ private:
 
     std::unique_ptr<folly::File> file_;
     std::unique_ptr<folly::IOBuf> body_;
-    cache::arc_cache<std::string, CacheRow *> *cache_;
+    Cache::ARC<std::string, CacheRow *> *cache_;
     bool readFileScheduled_ = false;
     bool paused_ = false;
     bool finished_ = false;

@@ -1,347 +1,155 @@
-#include "ExamplePlugin.h"
-#include <iomanip>
-#include <algorithm>
+#include "interface.h" // Assuming the header file is named plugin_manager.h
+#include <iostream>
+#include <sstream>
 
-ExamplePlugin::ExamplePlugin() 
-    : isInitialized_(false)
-    , randomGenerator_(std::chrono::steady_clock::now().time_since_epoch().count())
-    , requestCounter_(0) {
-    std::cout << "ExamplePlugin constructor called" << std::endl;
-}
+using namespace PluginManager;
 
-ExamplePlugin::~ExamplePlugin() {
-    if (isInitialized_) {
-        shutdown();
-    }
-    std::cout << "ExamplePlugin destructor called" << std::endl;
-}
+class HelloWorldPlugin : public IPlugin {
+private:
+    std::string greeting_;
+    bool logRequests_;
 
-std::string ExamplePlugin::getName() const {
-    return "ExamplePlugin";
-}
+public:
+    HelloWorldPlugin() : greeting_("Hello, World!"), logRequests_(true) {}
 
-std::string ExamplePlugin::getVersion() const {
-    return "1.0.0";
-}
+    bool initialize(const std::unordered_map<std::string, ConfigValue> &config) override {
+        // Read configuration
+        auto greetingIt = config.find("greeting");
+        if (greetingIt != config.end() && greetingIt->second.isString()) {
+            greeting_ = greetingIt->second.asString();
+        }
 
-bool ExamplePlugin::initialize() {
-    if (isInitialized_) {
+        auto logRequestsIt = config.find("logRequests");
+        if (logRequestsIt != config.end() && logRequestsIt->second.isBool()) {
+            logRequests_ = logRequestsIt->second.asBool();
+        }
+
         return true;
     }
-    
-    std::cout << "Initializing " << getName() << " v" << getVersion() << std::endl;
-    
-    // Initialize plugin configuration
-    config_["max_requests"] = "1000";
-    config_["timeout_ms"] = "5000";
-    config_["debug_mode"] = "true";
-    config_["api_key"] = "example-api-key-12345";
-    
-    // Simulate some initialization work
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    
-    isInitialized_ = true;
-    requestCounter_ = 0;
-    
-    std::cout << "ExamplePlugin initialized successfully" << std::endl;
-    return true;
-}
 
-void ExamplePlugin::shutdown() {
-    if (!isInitialized_) {
-        return;
-    }
-    
-    std::cout << "Shutting down " << getName() << std::endl;
-    std::cout << "Total requests processed: " << requestCounter_ << std::endl;
-    
-    // Cleanup resources
-    config_.clear();
-    isInitialized_ = false;
-    
-    std::cout << "ExamplePlugin shut down successfully" << std::endl;
-}
-
-HttpResponse ExamplePlugin::handleRequest(const HttpRequest& request) {
-    if (!isInitialized_) {
-        HttpResponse response;
-        response.statusCode = 503;
-        response.headers["Content-Type"] = "application/json";
-        response.body = R"({"error": "Plugin not initialized"})";
-        response.handled = false;
-        return response;
+    void shutdown() override {
+        // Clean up resources if needed
     }
 
-    requestCounter_++;
-
-    if (request.method == HttpMethod::GET) {
-        return handleGetRequest(request);
-    } else if (request.method == HttpMethod::POST) {
-        return handlePostRequest(request);
-    } else {
-        HttpResponse response;
-        response.statusCode = 405;
-        response.headers["Content-Type"] = "application/json";
-        response.headers["Allow"] = "GET, POST";
-        response.body = R"({"error": "Method not allowed"})";
-        response.handled = true;
-        return response;
+    std::string getName() const override {
+        return "HelloWorldPlugin";
     }
-}
 
-HttpResponse ExamplePlugin::handleGetRequest(const HttpRequest& request) {
-    if (request.path == "/api/status" || request.path == "/status") {
-        return handleApiStatus(request);
-    } else if (request.path == "/api/data" || request.path == "/data") {
-        return handleApiData(request);
-    } else if (request.path == "/api/random" || request.path == "/random") {
-        return handleApiRandom(request);
-    } else if (request.path.find("/api/") == 0) {
-        // Handle any API path
-        HttpResponse response;
-        response.statusCode = 200;
-        response.headers["Content-Type"] = "application/json";
-        
-        std::ostringstream oss;
-        oss << R"({
-    "message": "ExamplePlugin API",
-    "version": ")" << getVersion() << R"(",
-    "path": ")" << request.path << R"(",
-    "timestamp": ")" << getCurrentTime() << R"(",
-    "available_endpoints": [
-        "/api/status",
-        "/api/data",
-        "/api/random"
-    ]
-})";
-        
-        response.body = oss.str();
-        response.handled = true;
-        return response;
+    std::string getVersion() const override {
+        return "1.0.0";
     }
-    
-    return handleNotFound(request);
-}
 
-HttpResponse ExamplePlugin::handlePostRequest(const HttpRequest& request) {
-    if (request.path == "/api/echo" || request.path == "/echo") {
-        return handleApiEcho(request);
+    std::string getDescription() const override {
+        return "Simple hello world plugin";
     }
-    
-    // Default POST handler
-    HttpResponse response;
-    response.statusCode = 200;
-    response.headers["Content-Type"] = "application/json";
-    
-    std::ostringstream oss;
-    oss << R"({
-    "message": "POST request received",
-    "plugin": ")" << getName() << R"(",
-    "path": ")" << request.path << R"(",
-    "body_length": )" << request.body.length() << R"(,
-    "timestamp": ")" << getCurrentTime() << R"("
-})";
-    
-    response.body = oss.str();
-    response.handled = true;
-    return response;
-}
 
-HttpResponse ExamplePlugin::handleApiStatus(const HttpRequest& request) {
-    HttpResponse response;
-    response.statusCode = 200;
-    response.headers["Content-Type"] = "application/json";
-    
-    std::ostringstream oss;
-    oss << R"({
-    "status": "ok",
-    "plugin": ")" << getName() << R"(",
-    "version": ")" << getVersion() << R"(",
-    "initialized": )" << (isInitialized_ ? "true" : "false") << R"(,
-    "requests_processed": )" << requestCounter_ << R"(,
-    "timestamp": ")" << getCurrentTime() << R"(",
-    "uptime_info": "Plugin is running normally"
-})";
-    
-    response.body = oss.str();
-    response.handled = true;
-    return response;
-}
+    void registerHooks(HookManager &hookManager) override {
+        hookManager.registerHook(HookType::PRE_REQUEST, getName(),
+            [this](RequestContext &ctx) -> bool {
+                return this->handlePreRequest(ctx);
+            }, 50);
 
-HttpResponse ExamplePlugin::handleApiData(const HttpRequest& request) {
-    HttpResponse response;
-    response.statusCode = 200;
-    response.headers["Content-Type"] = "application/json";
-    
-    std::string format = parseQueryParam(request.query, "format");
-    std::string limit = parseQueryParam(request.query, "limit");
-    
-    int limitNum = 5;
-    if (!limit.empty()) {
-        try {
-            limitNum = std::stoi(limit);
-            limitNum = std::max(1, std::min(limitNum, 100));
-        } catch (...) {
-            limitNum = 5;
+        if (logRequests_) {
+            hookManager.registerHook(HookType::POST_REQUEST, getName(),
+                [this](RequestContext &ctx) -> bool {
+                    return this->logRequest(ctx);
+                }, 200); // Lower priority
         }
     }
-    
-    std::ostringstream oss;
-    oss << R"({
-    "data": [)";
-    
-    for (int i = 0; i < limitNum; ++i) {
-        if (i > 0) oss << ",";
-        oss << R"(
-        {
-            "id": )" << (i + 1) << R"(,
-            "name": "Item )" << (i + 1) << R"(",
-            "value": )" << (randomGenerator_() % 1000) << R"(,
-            "active": )" << ((i % 2 == 0) ? "true" : "false") << R"(
-        })";
-    }
-    
-    oss << R"(
-    ],
-    "total": )" << limitNum << R"(,
-    "format": ")" << (format.empty() ? "default" : format) << R"(",
-    "timestamp": ")" << getCurrentTime() << R"("
-})";
-    
-    response.body = oss.str();
-    response.handled = true;
-    return response;
-}
 
-HttpResponse ExamplePlugin::handleApiRandom(const HttpRequest& request) {
-    HttpResponse response;
-    response.statusCode = 200;
-    response.headers["Content-Type"] = "application/json";
-    
-    // Generate random data
-    std::uniform_int_distribution<int> dist(1, 1000);
-    std::uniform_real_distribution<float> floatDist(0.0f, 100.0f);
-    
-    std::ostringstream oss;
-    oss << R"({
-    "random_int": )" << dist(randomGenerator_) << R"(,
-    "random_float": )" << std::fixed << std::setprecision(2) << floatDist(randomGenerator_) << R"(,
-    "random_bool": )" << ((randomGenerator_() % 2) ? "true" : "false") << R"(,
-    "timestamp": ")" << getCurrentTime() << R"(",
-    "request_id": ")" << requestCounter_ << R"("
-})";
-    
-    response.body = oss.str();
-    response.handled = true;
-    return response;
-}
-
-HttpResponse ExamplePlugin::handleApiEcho(const HttpRequest& request) {
-    HttpResponse response;
-    response.statusCode = 200;
-    response.headers["Content-Type"] = "application/json";
-    
-    std::ostringstream oss;
-    oss << R"({
-    "echo": {
-        "method": ")" << (request.method == HttpMethod::GET ? "GET" :
-                         request.method == HttpMethod::POST ? "POST" :
-                         request.method == HttpMethod::PUT ? "PUT" :
-                         request.method == HttpMethod::DELETE ? "DELETE" :
-                         request.method == HttpMethod::PATCH ? "PATCH" :
-                         request.method == HttpMethod::OPTIONS ? "OPTIONS" :
-                         request.method == HttpMethod::HEAD ? "HEAD" :
-                         request.method == HttpMethod::TRACE ? "TRACE" :
-                         request.method == HttpMethod::CONNECT ? "CONNECT" :
-                         request.method == HttpMethod::CONNECT_UDP ? "CONNECT_UDP" :
-                         request.method == HttpMethod::SUB ? "SUB" :
-                         request.method == HttpMethod::PUB ? "PUB" :
-                         request.method == HttpMethod::UNSUB ? "UNSUB" : "UNKNOWN") << R"(",
-        "path": ")" << request.path << R"(",
-        "query": ")" << request.query << R"(",
-        "body": ")" << request.body << R"(",
-        "headers": {)";
-
-    // Use the IHeaders interface to iterate through headers
-    bool first = true;
-    if (request.headers) {
-        request.headers->forEach([&](const std::string& key, const std::string& value) {
-            if (!first) oss << ",";
-            oss << R"(
-            ")" << key << R"(": ")" << value << R"(")";
-            first = false;
-        });
-    }
-    
-    oss << R"(
+    bool validateConfig(const std::unordered_map<std::string, ConfigValue> &config) const override {
+        // Check if greeting exists and validate its type
+        auto greetingIt = config.find("greeting");
+        if (greetingIt != config.end() && !greetingIt->second.isString()) {
+            return false;
         }
-    },
-    "plugin_info": {
-        "name": ")" << getName() << R"(",
-        "version": ")" << getVersion() << R"("
-    },
-    "timestamp": ")" << getCurrentTime() << R"("
-})";
-    
-    response.body = oss.str();
-    response.handled = true;
-    return response;
-}
 
-HttpResponse ExamplePlugin::handleNotFound(const HttpRequest& request) {
-    HttpResponse response;
-    response.statusCode = 404;
-    response.headers["Content-Type"] = "application/json";
-    
-    std::ostringstream oss;
-    oss << R"({
-    "error": "Not Found",
-    "message": "The requested path was not found in ExamplePlugin",
-    "path": ")" << request.path << R"(",
-    "plugin": ")" << getName() << R"(",
-    "timestamp": ")" << getCurrentTime() << R"("
-})";
-    
-    response.body = oss.str();
-    response.handled = false; // Indicate this plugin didn't handle the request
-    return response;
-}
+        // Check if logRequests exists and validate its type
+        auto logRequestsIt = config.find("logRequests");
+        if (logRequestsIt != config.end() && !logRequestsIt->second.isBool()) {
+            return false;
+        }
 
-std::string ExamplePlugin::getCurrentTime() const {
-    auto now = std::chrono::system_clock::now();
-    auto time_t = std::chrono::system_clock::to_time_t(now);
-    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-        now.time_since_epoch()) % 1000;
-    
-    std::ostringstream oss;
-    oss << std::put_time(std::gmtime(&time_t), "%Y-%m-%dT%H:%M:%S");
-    oss << "." << std::setfill('0') << std::setw(3) << ms.count() << "Z";
-    return oss.str();
-}
-
-std::string ExamplePlugin::parseQueryParam(const std::string& query, const std::string& param) const {
-    if (query.empty()) return "";
-    
-    std::string searchParam = param + "=";
-    size_t pos = query.find(searchParam);
-    if (pos == std::string::npos) return "";
-    
-    pos += searchParam.length();
-    size_t endPos = query.find('&', pos);
-    if (endPos == std::string::npos) {
-        return query.substr(pos);
+        return true;
     }
-    return query.substr(pos, endPos - pos);
-}
 
+private:
+    bool handlePreRequest(RequestContext &ctx) {
+        if (ctx.request->path != "/hello") {
+            return true; // Continue processing
+        }
 
-// Export functions for plugin loading
+        ctx.response->setJsonContent();
+        ctx.response->setStatus(200, "OK");
+
+        std::ostringstream json;
+        json << "{\n";
+        json << "  \"message\": \"" << greeting_ << "\",\n";
+        json << "  \"plugin\": \"" << getName() << "\",\n";
+        json << "  \"version\": \"" << getVersion() << "\",\n";
+        json << "  \"method\": \"" << methodToString(ctx.request->method) << "\",\n";
+        json << "  \"clientIP\": \"" << ctx.request->clientIP << "\",\n";
+        json << "  \"requestId\": " << ctx.requestId << ",\n";
+        json << "  \"timestamp\": " << std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count() << "\n";
+        json << "}";
+
+        ctx.response->body = json.str();
+
+        return true;
+    }
+
+    bool logRequest(RequestContext &ctx) {
+        // Log the request (in a real implementation, you'd use the logger interface)
+        std::cout << "[HelloWorldPlugin] Request: "
+                  << methodToString(ctx.request->method)
+                  << " " << ctx.request->path
+                  << " from " << ctx.request->clientIP
+                  << " (ID: " << ctx.requestId << ")"
+                  << std::endl;
+
+        return true; // Continue processing
+    }
+
+    std::string methodToString(HttpMethod method) const {
+        switch (method) {
+            case HttpMethod::GET: return "GET";
+            case HttpMethod::POST: return "POST";
+            case HttpMethod::PUT: return "PUT";
+            case HttpMethod::DELETE: return "DELETE";
+            case HttpMethod::HEAD: return "HEAD";
+            case HttpMethod::OPTIONS: return "OPTIONS";
+            case HttpMethod::PATCH: return "PATCH";
+            case HttpMethod::CONNECT: return "CONNECT";
+            case HttpMethod::TRACE: return "TRACE";
+            default: return "UNKNOWN";
+        }
+    }
+};
+
+// Plugin factory functions (C interface)
 extern "C" {
-    IPlugin* createPlugin() {
-        return new ExamplePlugin();
+    PluginManager::IPlugin* createPlugin() {
+        return new HelloWorldPlugin();
     }
-    
-    void destroyPlugin(const IPlugin* plugin) {
+
+    void destroyPlugin(PluginManager::IPlugin* plugin) {
         delete plugin;
+    }
+
+    const char* getPluginName() {
+        return "HelloWorldPlugin";
+    }
+
+    const char* getPluginVersion() {
+        return "1.0.0";
+    }
+
+    const char* getPluginDescription() {
+        return "A simple hello world plugin that demonstrates the plugin framework";
+    }
+
+    int getPluginAPIVersion() {
+        return 1; // API version this plugin was built against
     }
 }

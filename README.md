@@ -78,7 +78,12 @@ cmake --build .
 Create a `server.yaml` by path `/etc/wbsrv/` file to specify global server settings:
 
 ```yaml
-threads: 8
+threads: 6
+plugins:
+  - path: "/path/to/plugin.so"  # Path to a shared library plugin
+    enabled: true
+    config:  # Optional plugin-specific configuration
+      key: "value"
 ```
 
 Within the same directory, create a `hosts/` folder with individual virtual host configurations. Example: `hosts/localhost.yaml`

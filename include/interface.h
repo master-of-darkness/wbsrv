@@ -117,8 +117,6 @@ namespace PluginManager {
         bool isInt() const { return type_ == INTEGER; }
         bool isDouble() const { return type_ == DOUBLE; }
         bool isBool() const { return type_ == BOOLEAN; }
-        bool isObject() const { return type_ == OBJECT; }
-        bool isArray() const { return type_ == ARRAY; }
         bool isNull() const { return type_ == NULLVAL; }
 
         std::string asString() const { return isString() ? stringVal_ : ""; }
@@ -139,10 +137,6 @@ namespace PluginManager {
             if (type_ != OBJECT) return nullValue;
             auto it = objectVal_.find(key);
             return (it != objectVal_.end()) ? it->second : nullValue;
-        }
-
-        bool hasKey(const std::string &key) const {
-            return type_ == OBJECT && objectVal_.find(key) != objectVal_.end();
         }
     };
 
@@ -180,7 +174,7 @@ namespace PluginManager {
     public:
         virtual ~IPlugin() = default;
 
-        virtual bool initialize(const ConfigValue &config) = 0;
+        virtual bool initialize(const std::unordered_map<std::string, ConfigValue> &config) = 0;
 
         virtual void shutdown() = 0;
 
@@ -192,17 +186,10 @@ namespace PluginManager {
 
         virtual void registerHooks(HookManager &hookManager) = 0;
 
-        virtual bool validateConfig(const ConfigValue &config) const {
+        virtual bool validateConfig(const std::unordered_map<std::string, ConfigValue> &config) const {
             return true; // Default: accept any config
         }
 
-        virtual std::vector<std::string> getDependencies() const {
-            return {}; // Default: no dependencies
-        }
-
-        virtual std::vector<std::string> getProvides() const {
-            return {}; // Default: no services provided
-        }
     };
 
     class HookManager {
@@ -231,7 +218,7 @@ namespace PluginManager {
     struct PluginContext {
         HookManager *hookManager{nullptr};
         ILogger *logger{nullptr};
-        ConfigValue config;
+        std::unordered_map<std::string, ConfigValue> config;
 
         // Plugin can store its own data here
         std::unordered_map<std::string, std::shared_ptr<void> > userData;
