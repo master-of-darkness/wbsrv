@@ -11,8 +11,8 @@
 - **High Performance** – Handles thousands of concurrent connections with event-driven architecture.
 - **Scalable** – Easily configurable for multi-threaded deployments on multi-core systems.
 - **Easy to Configure** – YAML-based configuration files for server and virtual hosts.
-- **Smart Caching** – Built-in ARC (Adaptive Replacement Cache) to store frequently accessed content in memory.
-- [**PHP Support**](https://github.com/master-of-darkness/wbsrv/tree/master/php_ext) – Native support for embedded PHP execution using the Embed SAPI.
+- **Smart Caching** – Built-in to store frequently accessed content in memory.
+- [**PHP Support**](https://github.com/master-of-darkness/wbsrv/tree/master/modules/php.cpp) – Native support for embedded PHP execution using the Embed SAPI.
 - **Extensions API for Developers** – Add new features yourself. Check out the [example](https://github.com/master-of-darkness/wbsrv/blob/master/tests/plugin/ExamplePlugin.cpp).
 ---
 
@@ -79,11 +79,6 @@ Create a `server.yaml` by path `/etc/wbsrv/` file to specify global server setti
 
 ```yaml
 threads: 6
-plugins:
-  - path: "/path/to/plugin.so"  # Path to a shared library plugin
-    enabled: true
-    config:  # Optional plugin-specific configuration
-      key: "value"
 ```
 
 Within the same directory, create a `hosts/` folder with individual virtual host configurations. Example: `hosts/localhost.yaml`

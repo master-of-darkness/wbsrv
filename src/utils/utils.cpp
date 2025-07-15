@@ -1,11 +1,10 @@
 #include "utils.h"
 
-namespace utils {
-    const char *getContentType(const std::string &path) {
+namespace Utils {
+    const char *getContentType(const folly::fbstring &path) {
         const size_t len = path.length();
         if (len < 3) return "application/octet-stream";
 
-        // Check last 4 characters for maximum efficiency
         const char c1 = path[len - 1];
         const char c2 = path[len - 2];
         const char c3 = len >= 3 ? path[len - 3] : 0;
@@ -151,8 +150,6 @@ namespace utils {
 
         // Longer extensions (4+ chars after dot)
         if (len >= 6) {
-            const char c6 = path[len - 6];
-
             // .xlsx / .XLSX
             if ((c1 == 'x' || c1 == 'X') && (c2 == 's' || c2 == 'S') &&
                 (c3 == 'l' || c3 == 'L') && (c4 == 'x' || c4 == 'X') && c5 == '.') {

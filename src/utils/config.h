@@ -3,9 +3,10 @@
 #include <yaml-cpp/yaml.h>
 #include <proxygen/httpserver/HTTPServer.h>
 #include <utility>
-#include "utils/utils.h"
+
 #include "cache.h"
-#include "interface.h"
+#include "utils/utils.h"
+
 
 namespace Config {
     class ServerConfig {
@@ -14,17 +15,9 @@ namespace Config {
             path_ = std::move(path);
         }
 
-        bool load();
+        bool initialize();
 
         int threads = 0;
-
-        struct PluginConfig {
-            std::string path;
-            bool enabled{true};
-            std::unordered_map<std::string, PluginManager::ConfigValue> parameters;
-        };
-
-        std::vector<PluginConfig> plugins;
 
     private:
         std::string path_;
@@ -36,7 +29,7 @@ namespace Config {
             path_ = std::move(path);
         }
 
-        bool load();
+        bool initialize();
 
         std::string private_key;
         std::string cert;
@@ -53,6 +46,8 @@ namespace Config {
         std::string path_;
     };
 
+    inline std::unordered_map<std::string, Cache::VirtualHostConfig> virtual_hosts;
+    inline std::unordered_map<std::string, Cache::FileSystemMetadata> files_metadata;
 
     bool load_virtual_host_configurations(std::vector<proxygen::HTTPServer::IPConfig> &ip_configs);
 }
